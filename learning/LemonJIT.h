@@ -14,12 +14,16 @@
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
-#include "llvm/ExecutionEngine/Orc/SelfExecutorProcessControl.h"
+// #include "llvm/ExecutionEngine/Orc/SelfExecutorProcessControl.h"
 #include "llvm/ExecutionEngine/Orc/Shared/ExecutorSymbolDef.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
 #include <memory>
+
+namespace llvm {
+namespace orc {
+
 
 class LemonJIT {
 private:
@@ -34,7 +38,7 @@ private:
     JITDylib &MainJD;
 
 public:
-    LemonJIT(std::make_unique<ExecutionSession> ES, 
+    LemonJIT(std::unique_ptr<ExecutionSession> ES, 
              JITTargetMachineBuilder JTMB, DataLayout DL)
         : ES(std::move(ES)), DL(std::move(DL)), Mangle(*this->ES, this->DL),
           ObjectLayer(*this->ES,
@@ -50,8 +54,8 @@ public:
                 cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
                     DL.getGlobalPrefix())));
             if (JTMB.getTargetTriple().isOSBinFormatCOFF()) {
-            ObjectLayer.setOverrideObjectFlagsWithResponsibilityFlags(true);
-            ObjectLayer.setAutoClaimResponsibilityForObjectSymbols(true);
+                ObjectLayer.setOverrideObjectFlagsWithResponsibilityFlags(true);
+                ObjectLayer.setAutoClaimResponsibilityForObjectSymbols(true);
             }
           }
 
@@ -99,5 +103,9 @@ public:
         return ES->lookup({&MainJD}, Mangle(Name.str()));
     }
 };
+
+
+}
+}
 
 #endif
