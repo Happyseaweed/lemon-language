@@ -7,8 +7,32 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+
+#include "./LemonJIT.h"
+
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -25,6 +49,16 @@ static std::unique_ptr<LLVMContext> TheContext;     // Contains core LLVM datast
 static std::unique_ptr<IRBuilder<>> Builder;        // Used for generating IR instructions
 static std::unique_ptr<Module> TheModule;           // Conains all generated IR
 static std::map<std::string, Value *> NamedValues;  // Symbol table for the code and its generated IR
+
+static std::unique_ptr<FunctionPassManager> TheFPM;
+static std::unique_ptr<LoopAnalysisManager> TheLAM;
+static std::unique_ptr<FunctionAnalysisManager> TheFAM;
+static std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
+static std::unique_ptr<ModuleAnalysisManager> TheMAM;
+static std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
+static std::unique_ptr<StandardInstrumentations> TheSI;
+
+static std::unique_ptr<LemonJIT> TheJIT;
 
 enum Token {
 	tok_eof = -1,
@@ -253,6 +287,9 @@ public:
             // Validate the generated code, checking for consistency.
             verifyFunction(*TheFunction);
 
+            // Optimization, wow this is literally magic!!!
+            TheFPM->run(*TheFunction, *TheFAM);
+
             return TheFunction;
         }
         // Error reading body, remove function.
@@ -452,8 +489,13 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 }
 
 static void HandleDefinition() {
-  if (ParseDefinition()) {
+  if (auto FnAST = ParseDefinition()) {
     fprintf(stderr, "Parsed a function definition.\n");
+    if (auto *FnIR = FnAST->codegen()) {
+        fprintf(stderr, "Read function definition: ");
+        FnIR->print(errs());
+        fprintf(stderr, "\n");
+    }
   } else {
     // Skip token for error recovery.
     getNextToken();
@@ -461,8 +503,13 @@ static void HandleDefinition() {
 }
 
 static void HandleExtern() {
-  if (ParseExtern()) {
+  if (auto FnAST = ParseExtern()) {
     fprintf(stderr, "Parsed an extern\n");
+    if (auto *FnIR = FnAST->codegen()) {
+        fprintf(stderr, "Read extern: ");
+        FnIR->print(errs());
+        fprintf(stderr, "\n");
+    }
   } else {
     // Skip token for error recovery.
     getNextToken();
@@ -471,8 +518,29 @@ static void HandleExtern() {
 
 static void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
-  if (ParseTopLevelExpr()) {
+  if (auto FnAST = ParseTopLevelExpr()) {
     fprintf(stderr, "Parsed a top-level expr\n");
+    if (auto *FnIR = FnAST->codegen()) {
+        // Create a ResourceTracker to track JIT'd memory allocated to our
+        // anonymous expression -- that way we can free it after executing.
+        auto RT = TheJIT->getMainJITDylib().createResourceTracker();
+
+        auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+        ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
+        InitializeModuleAndManager();
+
+        // Search the JIT for the __anon_expr symbol.
+        auto ExprSymbol = ExitOnErr(TheJIT->lookup("__anon_expr"));
+        assert(ExprSymbol && "Function not found");
+
+        // Get the symbol's address and cast it to the right type (takes no
+        // arguments, returns a double) so we can call it as a native function.
+        double (*FP)() = ExprSymbol.getAddress().toPtr<double (*)()>();
+        fprintf(stderr, "Evaluated to %f\n", FP());
+
+        // Delete the anonymous expression module from the JIT.
+        ExitOnErr(RT->remove());
+    }
   } else {
     // Skip token for error recovery.
     getNextToken();
@@ -502,7 +570,47 @@ static void MainLoop() {
     }
 }
 
+static void InitializeModuleAndManager(void) {
+    TheContext = std::make_unique<LLVMContext>();
+    TheModule = std::make_unique<Module>("Lemon JIT", *TheContext);
+    TheModule->setDataLayout(TheJIT->getDataLayout());
+
+    Builder = std::make_unique<IRBuilder<> >(*TheContext);
+
+    // Create new pass and analysis managers.
+    TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
+    TheLAM = std::make_unique<LoopAnalysisManager>();
+    TheFAM = std::make_unique<FunctionAnalysisManager>();
+    TheCGAM = std::make_unique<CGSCCAnalysisManager>();
+    TheMAM = std::make_unique<ModuleAnalysisManager>();
+
+    ThePIC = std::make_unique<PassInstrumentationCallbacks>();
+    TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
+                                                        /*DebugLogging*/ true);
+    TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+    // Add transform passes.
+    // Do simple "peephole" optimizations and bit-twiddling optimizations.
+    TheFPM->addPass(InstCombinePass());
+    // Reassociate expressions.
+    TheFPM->addPass(ReassociatePass());
+    // Eliminate Common SubExpressions.
+    TheFPM->addPass(GVNPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    TheFPM->addPass(SimplifyCFGPass());
+
+    // // Register analysis passes used in these transform passes.
+    PassBuilder PB;
+    PB.registerModuleAnalyses(*TheMAM);
+    PB.registerFunctionAnalyses(*TheFAM);
+    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
+}
+
 int main() {
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+
     // Smaller number = lower precedence.
     BinopPrecedence['<'] = 10;
     BinopPrecedence['+'] = 20;
@@ -511,6 +619,8 @@ int main() {
 
     fprintf(stderr, "ready> ");
     getNextToken();
+
+    TheJIT = std::make_unique<LemonJIT>();
 
     MainLoop();
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-clang++ -g -O3 ref.cc `llvm-config --cxxflags --ldflags --system-libs --libs core` -o lemon
+clang++ -g -O3 lemon.cc `llvm-config --cxxflags --ldflags --system-libs --libs core` -o lemon
 
 # clang -g -O3 lemon.cc -L/opt/homebrew/opt/llvm/lib -I/opt/homebrew/opt/llvm/include -o lemon
 
