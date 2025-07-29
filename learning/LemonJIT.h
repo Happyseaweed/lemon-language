@@ -25,6 +25,8 @@ namespace llvm {
 namespace orc {
 
 
+// std::unique_function<std::unique_ptr<GetMemoryManager> >;
+
 class LemonJIT {
 private:
     std::unique_ptr<ExecutionSession> ES;
@@ -42,7 +44,7 @@ public:
              JITTargetMachineBuilder JTMB, DataLayout DL)
         : ES(std::move(ES)), DL(std::move(DL)), Mangle(*this->ES, this->DL),
           ObjectLayer(*this->ES,
-                      [](const MemoryBuffer &) {
+                      []() {
                         return std::make_unique<SectionMemoryManager>();
                       }),
           CompileLayer(*this->ES, ObjectLayer,
@@ -96,7 +98,7 @@ public:
             RT = MainJD.getDefaultResourceTracker();
         }
 
-        return CompilerLayer.add(RT, std:;move(TSM));
+        return CompileLayer.add(RT, std::move(TSM));
     }
 
     Expected<ExecutorSymbolDef> lookup(StringRef Name) {
