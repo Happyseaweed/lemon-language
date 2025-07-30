@@ -2,4 +2,4 @@
 
 clang++ -g -O3 lemon.cc `llvm-config --cxxflags --ldflags --system-libs --libs core` -o lemon
 
-./lemon
+# ./lemon
