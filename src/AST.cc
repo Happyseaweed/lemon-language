@@ -155,9 +155,23 @@ Function *FunctionAST::codegen() {
         NamedValues[std::string(Arg.getName())] = Alloca;
     }
     
-    if (Value *RetVal = Body->codegen()) {
+    if (ExprBody) {
+        if (Value *RetVal = ExprBody->codegen()) {
+            // Finish off the function.
+            Builder->CreateRet(RetVal);
+
+            // Validate the generated code, checking for consistency.
+            verifyFunction(*TheFunction);
+
+            // Optimization, wow this is literally magic!!!
+            TheFPM->run(*TheFunction, *TheFAM);
+
+            return TheFunction;
+        }
+    } else if (StmtBody) {
+        StmtBody->codegen();
         // Finish off the function.
-        Builder->CreateRet(RetVal);
+        Builder->CreateRet(nullptr);
 
         // Validate the generated code, checking for consistency.
         verifyFunction(*TheFunction);
@@ -344,6 +358,33 @@ Value *VarExprAST::codegen() {
 
     return BodyVal;
 }
+
+// Statements don't evaluate to anything, so doesn't return Value *???
+void VarDeclStmtAST::codegen() {
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+    Value *InitVal = Init->codegen(); // Generate the RHS and evaluate value.
+
+    if (!InitVal)
+        return;
+    
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Name);
+    Builder->CreateStore(InitVal, Alloca);
+
+    NamedValues[Name] = Alloca;
+}
+
+void AssignmentStmtAST::codegen() {
+    Value *ExprVal = Expr->codegen();
+    Value *Variable = NamedValues[Name];
+    if (!ExprVal) 
+        return;
+
+    if (!Variable)
+        return;
+    
+    Builder->CreateStore(ExprVal, Variable);
+}
+
 
 // Helper function
 Function *getFunction(std::string Name) {

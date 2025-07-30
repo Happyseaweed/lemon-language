@@ -16,6 +16,11 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
     return nullptr;
 }
 
+std::unique_ptr<StmtAST> LogErrorS(const char *Str) {
+    fprintf(stderr, "Error: %s\n", Str);
+    return nullptr;
+}
+
 Value *LogErrorV(const char *Str) {
   LogError(Str);
   return nullptr;
@@ -364,3 +369,64 @@ std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
     }
     return nullptr;
 }
+
+std::unique_ptr<StmtAST> ParseStatement() {
+    switch (CurTok) {
+        case tok_var:
+            return ParseVarDecl();
+        case tok_lbrace:
+            return ParseBlock();
+        case tok_identifier:
+            return ParseAssignmentOrExprStmt();
+        default:
+            return ParseExprStatement();
+    }
+}
+
+std::unique_ptr<StmtAST> ParseVarDecl() {
+    getNextToken(); // consume 'var'
+
+    if (CurTok != tok_identifier)
+        return LogErrorS("Expected Identifier after 'var' ");
+   
+    std::string VarName = IdentifierStr;
+    getNextToken(); // consume ID
+
+    if (CurTok != tok_equal) 
+        return LogErrorS("Expected '=' after var name");
+    
+    getNextToken(); // consume '='
+
+    std::unique_ptr<ExprAST> Init = ParseExpression(); // Get ExprAST for RHS 
+    if (!Init) 
+        return nullptr; // Bad
+
+    return std::make_unique<VarDeclStmtAST>(VarName, std::move(Init));
+}
+
+//! Change this to just handle assignment stmt?
+std::unique_ptr<StmtAST> ParseAssignmentOrExprStmt() {
+    std::string VarName = IdentifierStr;
+    getNextToken(); // Consume ID;
+
+    // Assignment stmt
+    if (CurTok == tok_equal) {
+        getNextToken(); // Consume '='
+        std::unique_ptr<ExprAST> Expr = ParseExpression();
+        
+        if (!Expr)
+            return nullptr;
+
+        return std::make_unique<AssignmentStmtAST>(VarName, std::move(Expr));   
+    }
+}
+
+//! REMOVE? 
+std::unique_ptr<StmtAST> ParseExprStatement() {
+    std::unique_ptr<ExprAST> Expr = ParseExpression();
+    if (!Expr)
+        return nullptr;
+
+    return nullptr;
+}
+

@@ -195,13 +195,51 @@ public:
 // ============================================================================
 class FunctionAST {
     std::unique_ptr<PrototypeAST> Proto;
-    std::unique_ptr<ExprAST> Body;
+    std::unique_ptr<ExprAST> ExprBody = nullptr;
+    std::unique_ptr<StmtAST> StmtBody = nullptr;
+
 public:
     FunctionAST(std::unique_ptr<PrototypeAST> Proto, 
                 std::unique_ptr<ExprAST> Body)
-        : Proto(std::move(Proto)), Body(std::move(Body)) {}
+        : Proto(std::move(Proto)), ExprBody(std::move(Body)) {}
+
+    FunctionAST(std::unique_ptr<PrototypeAST> Proto, 
+                std::unique_ptr<StmtAST> Body)
+        : Proto(std::move(Proto)), StmtBody(std::move(Body)) {}
 
     Function *codegen();
+};
+
+
+// ============================================================================
+//                              Statement AST    
+// ============================================================================
+class StmtAST {
+public:
+    virtual ~StmtAST() = default;
+    virtual void codegen() = 0;
+};
+
+// ============================================================================
+class VarDeclStmtAST : public StmtAST {
+    std::string Name;
+    std::unique_ptr<ExprAST> Init;
+
+public:
+    VarDeclStmtAST(std::string Name, std::unique_ptr<ExprAST> Init)
+        : Name(Name), Init(std::move(Init)) {}
+
+    void codegen() override;
+};
+
+class AssignmentStmtAST : public StmtAST {
+    std::string Name;
+    std::unique_ptr<ExprAST> Expr;
+public:
+    AssignmentStmtAST(std::string Name, std::unique_ptr<ExprAST> Expr)
+        : Name(Name), Expr(std::move(Expr)) {}
+
+    void codegen() override;
 };
 
 // ============================================================================

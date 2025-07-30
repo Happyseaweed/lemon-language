@@ -71,21 +71,63 @@ static void HandleTopLevelExpression() {
   }
 }
 
+static void HandleTopLevelStatement() {
+    if (auto Stmt = ParseStatement()) {
+        // Proto
+        auto Proto = std::make_unique<PrototypeAST>("__anon_stmt", std::vector<std::string>());
+
+        auto FnAST = std::make_unique<FunctionAST>(std::move(Proto), std::move(Stmt));
+
+        if (FnAST->codegen()) {
+            // Create a ResourceTracker to track JIT'd memory allocated to our
+            // anonymous stmt -- that way we can free it after executing.
+            auto RT = TheJIT->getMainJITDylib().createResourceTracker();
+
+            auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+            ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
+            InitializeModuleAndManager();
+
+            // Search JIT for __anon_stmt symbol
+            auto StmtSymbol = ExitOnErr(TheJIT->lookup("__anon_stmt"));
+
+            // Get the symbol's address and cast it to the right type (no returns) 
+            // so we can call it as a native function.
+            void (*FP)() = StmtSymbol.toPtr<void (*)()>();
+
+            FP(); // Execute stmt block
+
+            // Delete the anonymous expression module from the JIT.
+            ExitOnErr(RT->remove());
+        }
+    } else {
+        getNextToken();
+    }
+}
+
 static void MainLoop() {
     while(true) {
         if (REPL_MODE) fprintf(stderr, "ready> ");
         switch (CurTok)  {
             case tok_eof:
                 return;
-            case ';':
-                getNextToken();
-                break;
             case tok_def:
                 HandleDefinition();
                 break;
             case tok_extern:
                 HandleExtern();
                 break;
+           
+            case tok_semi:
+                getNextToken();
+                break;
+            case tok_lbrace:
+            case tok_rbrace:
+            case tok_if:
+            case tok_for:
+            case tok_return:
+                HandleTopLevelStatement(); 
+                break;
+                
             default:
                 HandleTopLevelExpression();
                 break;

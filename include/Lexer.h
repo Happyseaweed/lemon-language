@@ -1,4 +1,4 @@
-#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APFloat.h" 		// Definitely need to move these somewhere else, IWYU
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -69,8 +69,14 @@ enum Token {
 	// User-defined variables
     tok_var = -13,
 
-	// Tensors
-	tok_tensor = -14
+	// More lemon features 
+	tok_lbrace = -14,
+	tok_rbrace = -15,
+	tok_semi = -16,
+	
+	tok_equal = -17,
+	tok_return = -19,
+	tok_while = -20
 };
 
 // ============================================================================

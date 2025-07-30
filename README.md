@@ -8,7 +8,7 @@ The goal is:
 1) Create a simple language that is capable of implementing simple ML concepts.
 
 Features:
-- Types: float, bool, tensor
+- Types: float, tensor
 - Conditionals: if/else, for
 - Functions
 
