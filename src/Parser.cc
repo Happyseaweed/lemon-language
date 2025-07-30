@@ -25,7 +25,7 @@ Value *LogErrorV(const char *Str) {
 //                            Helper Functions
 // ============================================================================
 
-static int GetTokPrecedence() {
+int GetTokPrecedence() {
     if (!isascii(CurTok)) 
         return -1;
 

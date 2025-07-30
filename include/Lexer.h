@@ -39,6 +39,7 @@
 
 // ============================================================================
 
+using namespace llvm;
 // ============================================================================
 // Tokens 
 enum Token {
@@ -73,9 +74,12 @@ enum Token {
 };
 
 // ============================================================================
-std::string IdentifierStr; 	// Filled in if tok_identifier
-double NumVal; 				// Filled in if tok_number
-int CurTok;					// Current token
+// lexer.h
+#pragma once
+
+extern std::string IdentifierStr; 	// Filled in if tok_identifier
+extern double NumVal; 				// Filled in if tok_number
+extern int CurTok;					// Current token
 
 // ============================================================================
 int gettok();

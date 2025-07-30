@@ -1,7 +1,7 @@
 #include "../include/Lexer.h"
-
-using namespace llvm;
-
+std::string IdentifierStr; 	
+double NumVal; 				
+int CurTok;					
 
 int gettok() {
 	static int LastChar = ' ';

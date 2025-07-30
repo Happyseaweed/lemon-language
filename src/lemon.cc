@@ -40,7 +40,6 @@ static void HandleExtern() {
   }
 }
 
-
 static void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
   if (auto FnAST = ParseTopLevelExpr()) {
@@ -72,10 +71,9 @@ static void HandleTopLevelExpression() {
   }
 }
 
-
 static void MainLoop() {
     while(true) {
-        if (REPL_MODE) (stderr, "ready> ");
+        if (REPL_MODE) fprintf(stderr, "ready> ");
         switch (CurTok)  {
             case tok_eof:
                 return;
@@ -181,7 +179,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (REPL_MODE) (stderr, "ready> ");
+    if (REPL_MODE) fprintf(stderr, "ready> ");
     getNextToken();
 
     TheJIT = ExitOnErr(LemonJIT::Create());

@@ -4,6 +4,24 @@
 // ============================================================================
 #include "../include/AST.h"
 
+std::unique_ptr<LLVMContext> TheContext;     // Contains core LLVM datastructures
+std::unique_ptr<IRBuilder<>> Builder;        // Used for generating IR instructions
+std::unique_ptr<Module> TheModule;           // Conains all generated IR
+std::map<std::string, AllocaInst*> NamedValues;  // Symbol table for the code and its generated IR
+
+std::unique_ptr<FunctionPassManager> TheFPM;
+std::unique_ptr<LoopAnalysisManager> TheLAM;
+std::unique_ptr<FunctionAnalysisManager> TheFAM;
+std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
+std::unique_ptr<ModuleAnalysisManager> TheMAM;
+std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
+std::unique_ptr<StandardInstrumentations> TheSI;
+
+std::unique_ptr<LemonJIT> TheJIT;
+std::map<char, int> BinopPrecedence;
+
+std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
 Value *NumberExprAST::codegen() {
     return ConstantFP::get(*TheContext, APFloat(Val));
 }
@@ -326,4 +344,20 @@ Value *VarExprAST::codegen() {
     }
 
     return BodyVal;
+}
+
+// Helper function
+Function *getFunction(std::string Name) {
+    // First, see if the function has already been added to the current module.
+    if (auto *F = TheModule->getFunction(Name))
+        return F;
+
+    // If not, check whether we can codegen the declaration from some existing
+    // prototype.
+    auto FI = FunctionProtos.find(Name);
+    if (FI != FunctionProtos.end())
+        return FI->second->codegen();
+
+    // If no existing prototype exists, return null.
+    return nullptr;
 }
