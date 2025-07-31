@@ -67,6 +67,13 @@ public:
 };
 
 // ============================================================================
+class StmtAST {
+public:
+    virtual ~StmtAST() = default;
+    virtual void codegen() = 0;
+};
+
+// ============================================================================
 class NumberExprAST : public ExprAST {
     double Val;
 public:
@@ -214,11 +221,6 @@ public:
 // ============================================================================
 //                              Statement AST    
 // ============================================================================
-class StmtAST {
-public:
-    virtual ~StmtAST() = default;
-    virtual void codegen() = 0;
-};
 
 // ============================================================================
 class VarDeclStmtAST : public StmtAST {

@@ -78,6 +78,9 @@ int gettok() {
 	if (LastChar == ';')
 		return tok_semi;
 
+	if (LastChar == '=')
+		return tok_equal;
+
 	// EOF and other undefined symbols.
 	if (LastChar == EOF) 
 		return tok_eof;

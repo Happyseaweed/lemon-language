@@ -72,6 +72,7 @@ static void HandleTopLevelExpression() {
 }
 
 static void HandleTopLevelStatement() {
+    fprintf(stderr, "Handling Top Level Statement.\n");
     if (auto Stmt = ParseStatement()) {
         // Proto
         auto Proto = std::make_unique<PrototypeAST>("__anon_stmt", std::vector<std::string>());
@@ -108,6 +109,7 @@ static void MainLoop() {
     while(true) {
         if (REPL_MODE) fprintf(stderr, "ready> ");
         switch (CurTok)  {
+
             case tok_eof:
                 return;
             case tok_def:
@@ -120,14 +122,16 @@ static void MainLoop() {
             case tok_semi:
                 getNextToken();
                 break;
+
             case tok_lbrace:
             case tok_rbrace:
             case tok_if:
             case tok_for:
             case tok_return:
+            case tok_var:
                 HandleTopLevelStatement(); 
                 break;
-                
+
             default:
                 HandleTopLevelExpression();
                 break;
@@ -214,12 +218,6 @@ int main(int argc, char *argv[]) {
     BinopPrecedence['+'] = 20;
     BinopPrecedence['-'] = 30;
     BinopPrecedence['*'] = 40;
-
-    if (argc > 1) {
-        if (argv[1] == "1") {
-            REPL_MODE = 1;
-        }
-    }
 
     if (REPL_MODE) fprintf(stderr, "ready> ");
     getNextToken();

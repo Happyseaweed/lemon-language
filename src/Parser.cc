@@ -219,7 +219,8 @@ std::unique_ptr<ExprAST> ParseVarExpr() {
 std::unique_ptr<ExprAST> ParsePrimary() {
     switch (CurTok) {
         default:
-            return LogError("Unknown token when expecting an expression");
+            return nullptr;
+            // return LogError("Unknown token when expecting an expression");
         case tok_identifier:
             return ParseIdentifierExpr();
         case tok_number:
@@ -236,8 +237,11 @@ std::unique_ptr<ExprAST> ParsePrimary() {
 }
 
 std::unique_ptr<ExprAST> ParseUnary() {
+    fprintf(stderr, "Parsing Unary\n");
     if (!isascii(CurTok) || CurTok == '(' || CurTok == ',')
         return ParsePrimary();
+    
+    fprintf(stderr, "%d\n", CurTok);
     
     int Opc = CurTok;
     getNextToken();
@@ -384,6 +388,7 @@ std::unique_ptr<StmtAST> ParseStatement() {
 }
 
 std::unique_ptr<StmtAST> ParseVarDecl() {
+    fprintf(stderr, "Parsing Variable Decl\n");
     getNextToken(); // consume 'var'
 
     if (CurTok != tok_identifier)
@@ -404,6 +409,10 @@ std::unique_ptr<StmtAST> ParseVarDecl() {
     return std::make_unique<VarDeclStmtAST>(VarName, std::move(Init));
 }
 
+std::unique_ptr<StmtAST> ParseBlock() {
+    return nullptr;
+}
+
 //! Change this to just handle assignment stmt?
 std::unique_ptr<StmtAST> ParseAssignmentOrExprStmt() {
     std::string VarName = IdentifierStr;
@@ -419,6 +428,7 @@ std::unique_ptr<StmtAST> ParseAssignmentOrExprStmt() {
 
         return std::make_unique<AssignmentStmtAST>(VarName, std::move(Expr));   
     }
+    return nullptr;
 }
 
 //! REMOVE? 
