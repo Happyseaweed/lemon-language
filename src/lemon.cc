@@ -10,7 +10,7 @@ static void InitializeModuleAndManager(void);
 
 static void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {
-    fprintf(stderr, "Parsed a function definition.\n");
+    if (verbose) fprintf(stderr, "Parsed a function definition.\n");
     if (auto *FnIR = FnAST->codegen()) {
         if (verbose) fprintf(stderr, "Read function definition: ");
         if (verbose) FnIR->print(errs());
@@ -72,7 +72,7 @@ static void HandleTopLevelExpression() {
 }
 
 static void HandleTopLevelStatement() {
-    fprintf(stderr, "Handling Top Level Statement.\n");
+    // fprintf(stderr, "Handling Top Level Statement.\n");
     if (auto Stmt = ParseStatement()) {
         // Proto
         auto Proto = std::make_unique<PrototypeAST>("__anon_stmt", std::vector<std::string>());
@@ -123,14 +123,14 @@ static void MainLoop() {
                 getNextToken();
                 break;
 
-            case tok_lbrace:
-            case tok_rbrace:
-            case tok_if:
-            case tok_for:
-            case tok_return:
-            case tok_var:
-                HandleTopLevelStatement(); 
-                break;
+            // case tok_lbrace:
+            // case tok_rbrace:
+            // case tok_if:
+            // case tok_for:
+            // case tok_return:
+            // case tok_var:
+            //     HandleTopLevelStatement(); 
+            //     break;
 
             default:
                 HandleTopLevelExpression();

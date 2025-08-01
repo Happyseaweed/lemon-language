@@ -35,7 +35,7 @@ Value *VariableExprAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-    fprintf(stderr, "Prototype Codegen\n");
+    // fprintf(stderr, "Prototype Codegen\n");
     std::vector<Type*> Doubles(Args.size(),
                                 Type::getDoubleTy(*TheContext));
     FunctionType *FT =
@@ -52,7 +52,7 @@ Function *PrototypeAST::codegen() {
 }
 
 Value *BinaryExprAST::codegen() {
-    fprintf(stderr, "Binary Expr Codegen\n");
+    // fprintf(stderr, "Binary Expr Codegen\n");
 
     // Special case for assignment operator
     if (Op == '=') {
@@ -103,7 +103,7 @@ Value *BinaryExprAST::codegen() {
 }
 
 Value *CallExprAST::codegen() {
-    fprintf(stderr, "Call Expr Codegen\n");
+    // fprintf(stderr, "Call Expr Codegen\n");
 
     // Look up the name in the global module table.
     Function *CalleeF = getFunction(Callee);
@@ -127,7 +127,7 @@ Value *CallExprAST::codegen() {
 }
 
 Function *FunctionAST::codegen() {
-    fprintf(stderr, "Function Codegen\n"); 
+    // fprintf(stderr, "Function Codegen\n"); 
     
     // First, check for an existing function from a previous 'extern' declaration.
     auto &P = *Proto;

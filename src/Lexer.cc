@@ -69,17 +69,25 @@ int gettok() {
 	}
 
 	// {, }, ;
-	if (LastChar == '}') 
+	if (LastChar == '}') {
+		LastChar = getchar();
 		return tok_rbrace;
-	
-	if (LastChar == '{')
-		return tok_lbrace;
-	
-	if (LastChar == ';')
-		return tok_semi;
+	}
 
-	if (LastChar == '=')
-		return tok_equal;
+	if (LastChar == '{') {
+		LastChar = getchar();
+		return tok_lbrace;
+	}
+	
+	if (LastChar == ';') {
+		LastChar = getchar();
+		return tok_semi;
+	}
+
+	// if (LastChar == '=') {
+	// 	LastChar = getchar();
+	// 	return tok_equal;
+	// }
 
 	// EOF and other undefined symbols.
 	if (LastChar == EOF) 

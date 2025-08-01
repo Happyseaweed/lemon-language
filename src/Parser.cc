@@ -237,11 +237,11 @@ std::unique_ptr<ExprAST> ParsePrimary() {
 }
 
 std::unique_ptr<ExprAST> ParseUnary() {
-    fprintf(stderr, "Parsing Unary\n");
+    // fprintf(stderr, "Parsing Unary\n");
     if (!isascii(CurTok) || CurTok == '(' || CurTok == ',')
         return ParsePrimary();
     
-    fprintf(stderr, "%d\n", CurTok);
+    // fprintf(stderr, "%d\n", CurTok);
     
     int Opc = CurTok;
     getNextToken();
@@ -388,7 +388,7 @@ std::unique_ptr<StmtAST> ParseStatement() {
 }
 
 std::unique_ptr<StmtAST> ParseVarDecl() {
-    fprintf(stderr, "Parsing Variable Decl\n");
+    // fprintf(stderr, "Parsing Variable Decl\n");
     getNextToken(); // consume 'var'
 
     if (CurTok != tok_identifier)
@@ -397,7 +397,7 @@ std::unique_ptr<StmtAST> ParseVarDecl() {
     std::string VarName = IdentifierStr;
     getNextToken(); // consume ID
 
-    if (CurTok != tok_equal) 
+    if (CurTok != '=') 
         return LogErrorS("Expected '=' after var name");
     
     getNextToken(); // consume '='
@@ -419,7 +419,7 @@ std::unique_ptr<StmtAST> ParseAssignmentOrExprStmt() {
     getNextToken(); // Consume ID;
 
     // Assignment stmt
-    if (CurTok == tok_equal) {
+    if (CurTok == '=') {
         getNextToken(); // Consume '='
         std::unique_ptr<ExprAST> Expr = ParseExpression();
         
