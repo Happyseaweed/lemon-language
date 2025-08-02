@@ -1,4 +1,4 @@
-# CMAKE Lists - Jul 30 2025
+# CMAKE Lists - July 2025
 # Siwei Du
 
 cmake_minimum_required(VERSION 3.15)
