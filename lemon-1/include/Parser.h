@@ -17,11 +17,13 @@ int getPrecedence(int tok);
 
 
 // Error Functions
-std::unique_ptr<ExprAST> LogError(const char *Str);
+std::unique_ptr<ExprAST> LogError(const char *str);
 
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str);
+std::unique_ptr<PrototypeAST> LogErrorP(const char *str);
 
-std::unique_ptr<StmtAST> LogErrorS(const char *Str);
+std::unique_ptr<StmtAST> LogErrorS(const char *str);
+
+std::unique_ptr<FunctionAST> LogErrorF(const char *str);
 
 Value *LogErrorV(const char *Str);
 
@@ -36,6 +38,8 @@ std::unique_ptr<StmtAST> ParseStatement();
 std::unique_ptr<PrototypeAST> ParsePrototype();
 
 std::unique_ptr<FunctionAST> ParseFunction();
+
+std::unique_ptr<StmtAST> ParseExtern();
 
 std::vector<std::unique_ptr<ExprAST>> ParseArgList();
 

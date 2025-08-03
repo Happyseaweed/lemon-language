@@ -2,21 +2,28 @@
 // AST Declarations 
 // ============================================================================
 #include "llvm/IR/Value.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/ADT/StringRef.h"
 
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 using namespace llvm;
 
 #pragma once
 
-
 // EXPRESSION
 class ExprAST {
 public:
     virtual ~ExprAST() = default;
-    virtual Value *codegen() = 0;
+    virtual Value *codegen(const std::string scope = "_global") = 0;
     virtual void showAST() = 0;
 };
 
@@ -24,7 +31,7 @@ public:
 class StmtAST {
 public:
     virtual ~StmtAST() = default;
-    virtual Value *codegen() = 0;
+    virtual Value *codegen(const std::string scope = "_global") = 0;
     virtual void showAST() = 0;
 };
 
@@ -37,7 +44,7 @@ public:
              uint64_t optimizations)
         : statements(std::move(statements)), optimizations(optimizations) {}
 
-    Value *codegen();
+    Value *codegen(const std::string scope = "_global");
     void showAST();
 };
 
@@ -51,7 +58,7 @@ public:
                   std::unique_ptr<ExprAST> RHS)
         : op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
     
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 
     // Helpers
@@ -64,7 +71,7 @@ public:
     NumberExprAST(double val)
         : val(val) {}
     
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 
     // Helpers
@@ -77,7 +84,7 @@ public:
     VariableExprAST(const std::string &varName) 
         : varName(varName) {}
 
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 
     // Helpers
@@ -91,11 +98,13 @@ public:
     CallExprAST(std::string callee, std::vector<std::unique_ptr<ExprAST>> args)
         : callee(callee), args(std::move(args)) {}
     
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 };
 
 // STATEMENT
+// Function signatures are always IDs and IDs only.
+//      => Calls can contain EXPRs for args.
 
 class PrototypeAST {
     std::string name;
@@ -105,8 +114,10 @@ public:
     PrototypeAST(const std::string name, std::vector<std::string> args)
         : name(name), args(std::move(args)) {}
 
-    Function *codegen();
+    Function *codegen(const std::string scope = "_global");
     void showAST();
+
+    const std::string getName() const { return name; }
 };
 
 class VariableDeclStmt : public StmtAST {
@@ -116,7 +127,7 @@ public:
     VariableDeclStmt(std::string varName, std::unique_ptr<ExprAST> defBody) 
         : varName(varName), defBody(std::move(defBody)) {}
 
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 };
 
@@ -128,7 +139,7 @@ public:
     AssignmentStmt(std::string varName, std::unique_ptr<ExprAST> defBody) 
         : varName(varName), defBody(std::move(defBody)) {}
 
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 };
 
@@ -138,11 +149,11 @@ public:
     ReturnStmtAST(std::unique_ptr<ExprAST> retBody)
         : retBody(std::move(retBody)) {}
 
-    Value *codegen() override;
+    Value *codegen(const std::string scope) override;
     void showAST() override;
 };
 
-class FunctionAST {
+class FunctionAST : public StmtAST {
     std::unique_ptr<PrototypeAST> proto;
     std::vector<std::unique_ptr<StmtAST>> functionBody;
 public:
@@ -150,7 +161,36 @@ public:
                 std::vector<std::unique_ptr<StmtAST>> functionBody)
         : proto(std::move(proto)), functionBody(std::move(functionBody)) {}
     
-    Function *codegen();
-    void showAST();
+    Value *codegen(const std::string scope = "_global") override; // Returns Function *
+    void showAST() override;
 };
 
+class ExternAST : public StmtAST {
+    std::unique_ptr<PrototypeAST> proto;
+public:
+    ExternAST(std::unique_ptr<PrototypeAST> proto)
+        : proto(std::move(proto)) {}
+    
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
+
+// Core Variables and Helper functions
+
+extern std::unique_ptr<LLVMContext> TheContext;
+extern std::unique_ptr<IRBuilder<>> Builder;
+extern std::unique_ptr<Module> TheModule;
+extern std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable; // Stores all variables
+extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
+extern AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef varName);
+extern Function *getFunction(std::string name);
+
+extern std::unique_ptr<FunctionPassManager> TheFPM;
+extern std::unique_ptr<LoopAnalysisManager> TheLAM;
+extern std::unique_ptr<FunctionAnalysisManager> TheFAM;
+extern std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
+extern std::unique_ptr<ModuleAnalysisManager> TheMAM;
+extern std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
+extern std::unique_ptr<StandardInstrumentations> TheSI;

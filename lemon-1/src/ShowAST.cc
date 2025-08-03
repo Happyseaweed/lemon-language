@@ -32,13 +32,14 @@ void CallExprAST::showAST() {
     for (auto &item : args) {
         item->showAST();
     }
-    printf(")\n");
+    printf(")");
 }
 
 void PrototypeAST::showAST() {
     printf("Signature: %s(", name.c_str());
     for (auto &item : args) {
         printf("%s, ", item.c_str());
+        // item->showAST();
     }
     printf(")\n");
 }
@@ -62,10 +63,17 @@ void ReturnStmtAST::showAST() {
 }
 
 void FunctionAST::showAST() {
-    printf("Function: {");
+    printf("Function: \n");
     proto->showAST();
+    printf("{\n");
     for (auto &statement : functionBody) {
         statement->showAST();
     }
     printf("}\n");
+}
+
+void ExternAST::showAST() {
+    printf("Extern: ");
+    proto->showAST();
+    printf("\n");
 }

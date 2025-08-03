@@ -23,18 +23,23 @@ int getPrecedence(int tok) {
 //                               Error Helpers 
 // ============================================================================
 
-std::unique_ptr<ExprAST> LogError(const char *Str) {
-    fprintf(stderr, "ERROR: %s\n", Str);
+std::unique_ptr<ExprAST> LogError(const char *str) {
+    fprintf(stderr, "ERROR: %s\n", str);
     return nullptr;
 }
 
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-    LogError(Str);
+std::unique_ptr<PrototypeAST> LogErrorP(const char *str) {
+    LogError(str);
     return nullptr;
 }
 
-std::unique_ptr<StmtAST> LogErrorS(const char *Str) {
-    fprintf(stderr, "ERROR: %s\n", Str);
+std::unique_ptr<StmtAST> LogErrorS(const char *str) {
+    fprintf(stderr, "ERROR: %s\n", str);
+    return nullptr;
+}
+
+std::unique_ptr<FunctionAST> LogErrorF(const char *str) {
+    fprintf(stderr, "ERROR: %s\n", str);
     return nullptr;
 }
 
@@ -57,7 +62,7 @@ std::vector<std::unique_ptr<StmtAST>> ParseStatementList() {
     std::vector<std::unique_ptr<StmtAST>> stmtList;
     
     while(true) {
-        if (curTok == tok_eof) 
+        if (curTok == tok_eof || curTok == tok_rbrace) 
             break;
 
         stmtList.push_back(ParseStatement());
@@ -79,9 +84,13 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseVariableDecl();
         case tok_id:
             return ParseVariableAssign();
+        case tok_func:
+            return ParseFunction();
+        case tok_extern:
+            return ParseExtern();
         
         default:
-            fprintf(stderr, "ERROR: Token '%d' is not defined.", curTok);
+            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
             return LogErrorS("Unknow token when parsing statement.");
     }
 }
@@ -97,6 +106,7 @@ std::unique_ptr<StmtAST> ParseReturn() {
 
     if (curTok != tok_semi)
         return LogErrorS("Expected ';' after return statement.");
+    getNextToken();
     
     return std::make_unique<ReturnStmtAST>(std::move(E));
 }
@@ -145,6 +155,95 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
     getNextToken();
     
     return std::make_unique<AssignmentStmt>(varName, std::move(E));
+}
+
+// ============================================================================
+// Function and Function signature (Prototype)
+// ============================================================================
+
+std::unique_ptr<FunctionAST> ParseFunction() {
+    // func ID ( arg_list ) { STATEMENT LIST }
+    getNextToken(); // Consumes 'func' keyword
+    
+    auto proto = ParsePrototype();
+
+    if (!proto)
+        return nullptr;
+
+    // Now we only have { STATEMENT LIST } left to parse.
+
+    if (curTok != tok_lbrace)
+        return LogErrorF("Expected block '{' after function signature.");
+    getNextToken(); // Consume '{'
+
+    auto stmtList = ParseStatementList(); // Might need to change to support returns.
+
+    if (curTok != tok_rbrace)
+        return LogErrorF("Expected closing '}' after function body.");
+    getNextToken(); // Consume '}'
+
+
+    return std::make_unique<FunctionAST>(std::move(proto), std::move(stmtList));
+}
+
+std::unique_ptr<PrototypeAST> ParsePrototype() {
+    // func ID ( arg_list ) 
+    // Only consumes the above. Does not support forward declaration (yet)
+    std::string fnName;
+    std::vector<std::string> argList;
+
+    if (curTok != tok_id) 
+        return LogErrorP("Function signature expected identifier.");
+    fnName = idStr;
+    getNextToken(); // Consume ID
+    
+    if (curTok != tok_lparen)
+        return LogErrorP("Expected '(' in function signature.");
+    getNextToken(); // Consume '('
+
+    // Arg list
+    if (curTok != tok_rparen) {
+        while(true) {
+            // Args must be IDs or calls.
+            //! NOTE: Be careful for externs. No function call in arg list.
+
+            if (curTok != tok_id) 
+                return LogErrorP("Expected ID or ID() in function signature argument list.");
+
+            argList.push_back(idStr);
+            getNextToken();                
+            // if (auto E = ParseIdentifierExpr()) {
+            //     argList.push_back(std::move(E));
+            // } else {
+            //     return nullptr;
+            // }
+
+            if (curTok == tok_rparen)
+                break;
+            
+            if (curTok != tok_comma) {
+                return LogErrorP("Expected ')' or ',' in function signature argument list.");
+            }
+            
+            getNextToken();
+        }
+    }
+    getNextToken(); // Consumes ')'
+
+    return std::make_unique<PrototypeAST>(fnName, std::move(argList));    
+}
+
+
+std::unique_ptr<StmtAST> ParseExtern() {
+    getNextToken(); // Consume 'extern' keyword
+
+    auto proto = ParsePrototype();
+
+    if (curTok != tok_semi) 
+        return LogErrorS("Expected ';' after extern definition.");
+    getNextToken(); // Consume ';'
+
+    return std::make_unique<ExternAST>(std::move(proto));
 }
 
 // ============================================================================
@@ -261,66 +360,12 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     }
     
     getNextToken(); // Consume ')'
-
-    if (curTok != tok_semi)
-        return LogError("Expected ';' after function call.");
     
     return std::make_unique<CallExprAST>(identifier, std::move(argList));
 }
 
-// ============================================================================
-// Function and Function signature (Prototype)
-// ============================================================================
 
-std::unique_ptr<FunctionAST> ParseFunction() {
-    getNextToken(); // Consumes 'func'
-    auto proto = ParsePrototype();
 
-    if (!proto) {
-        fprintf(stderr, "ERROR: Function prototype parsing failed.\n");
-        return nullptr;
-    }
 
-    // Optional block { }, block contains list, otherwise just 1 statement.
 
-    auto sBody = ParseStatementList();
-
-    return std::make_unique<FunctionAST>(std::move(proto), std::move(sBody));
-}
-
-std::unique_ptr<PrototypeAST> ParsePrototype() {
-    // func ID ( ARG_LIST ) { STMT_LIST }
-    std::vector<std::string> args;
-    std::string functionName;
-
-    if (curTok != tok_id) {
-        return LogErrorP("Expected function identifier in prototype.");
-    }
-    functionName = idStr;
-
-    getNextToken(); // Consume ID
-
-    if (curTok != tok_lparen)
-        return LogErrorP("Expected '(' in protype.");
-
-    getNextToken(); // Consume '(', now curTok should be ID or ')'
-    while(curTok != tok_rparen) {
-        if (curTok == tok_id) 
-            args.push_back(idStr);
-        getNextToken();
-
-        if (curTok != tok_comma) 
-            return LogErrorP("Expected ',' in list of arguments for Prototype."); 
-        getNextToken(); 
-    }
-
-    // Sanity checking:
-    fprintf(stderr, "Parsed prototype args list: ");
-    for (auto &item : args) {
-        fprintf(stderr, "%s ", item.c_str());
-    }
-    // End of sanity checking
-
-    return std::make_unique<PrototypeAST>(functionName, std::move(args));  
-}
 
