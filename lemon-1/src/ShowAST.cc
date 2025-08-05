@@ -77,3 +77,9 @@ void ExternAST::showAST() {
     proto->showAST();
     printf("\n");
 }
+
+void ExpressionStmtAST::showAST() {
+    printf("Expression Statement: ");
+    expr->showAST();
+    printf("\n");
+}

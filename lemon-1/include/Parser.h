@@ -45,6 +45,8 @@ std::vector<std::unique_ptr<ExprAST>> ParseArgList();
 
 std::unique_ptr<StmtAST> ParseVariableDecl();
 
+std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall();
+
 std::unique_ptr<StmtAST> ParseVariableAssign();
 
 std::unique_ptr<StmtAST> ParseReturn();

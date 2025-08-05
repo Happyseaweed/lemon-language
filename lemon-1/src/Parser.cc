@@ -83,15 +83,16 @@ std::unique_ptr<StmtAST> ParseStatement() {
         case tok_var:
             return ParseVariableDecl();
         case tok_id:
-            return ParseVariableAssign();
+            return ParseVariableAssignOrFunctionCall();
         case tok_func:
             return ParseFunction();
         case tok_extern:
             return ParseExtern();
         
         default:
-            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
-            return LogErrorS("Unknow token when parsing statement.");
+            return nullptr;
+            // fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
+            // return LogErrorS("Unknown token when parsing statement.");
     }
 }
 
@@ -136,11 +137,29 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
     return std::make_unique<VariableDeclStmt>(varName, std::move(E));
 }
 
+std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
+    int peakedToken = peakNextToken();
+
+    if (peakedToken == tok_equal) {
+        return ParseVariableAssign();
+    }
+    else if (peakedToken == tok_lparen) {
+        auto expr = ParseIdentifierExpr(); // should return a function call.
+        
+        if (curTok != tok_semi)
+            return LogErrorS("Expected ';' after expression statement.");
+        getNextToken(); // Consume ';'
+
+        return std::make_unique<ExpressionStmtAST>(std::move(expr));
+    }
+    return nullptr; 
+}
+
 std::unique_ptr<StmtAST> ParseVariableAssign() {
     // ID = EXPR;
     // Does not allow chaining.
     std::string varName = idStr;
-    getNextToken();
+    getNextToken(); // consume ID
 
     if (curTok != tok_equal)
         return LogErrorS("Expected '=' in variable assignment statement.");
@@ -242,7 +261,7 @@ std::unique_ptr<StmtAST> ParseExtern() {
     if (curTok != tok_semi) 
         return LogErrorS("Expected ';' after extern definition.");
     getNextToken(); // Consume ';'
-
+    
     return std::make_unique<ExternAST>(std::move(proto));
 }
 
@@ -270,10 +289,7 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int precedence, std::unique_ptr<ExprAST> 
     while (true) {
         // Check next operator.
         int nextOpPrecedence = getPrecedence(curTok);
-        printf("IdStr: %s\n", idStr.c_str());
-        printf("current prec: %d\n", precedence);
-        printf("next op precedence: %d\n", nextOpPrecedence);
-
+        
         // If next character is binOP but less significant, don't include in current binop
         // Or if next character is not binOP, getPrecedence() should return -1.
         if (nextOpPrecedence < precedence)   
@@ -288,10 +304,8 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int precedence, std::unique_ptr<ExprAST> 
             return nullptr;
 
         int opAfterRHSPrecedence = getPrecedence(curTok);
-        printf("after RHS prec: %d\n", opAfterRHSPrecedence);
         if (opAfterRHSPrecedence > nextOpPrecedence) {      // Decide: recurse
             RHS = ParseBinOpRHS(nextOpPrecedence+1, std::move(RHS)); // +1 to prevent infinite (???)
-            printf("test\n");
             if (!RHS) 
                 return nullptr;
         }
@@ -301,6 +315,8 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int precedence, std::unique_ptr<ExprAST> 
 }
 
 std::unique_ptr<ExprAST> ParseFactor() {
+    printf("Parsing Factor: curTok: %d\n", curTok);
+
     if (curTok == tok_id) {
         return ParseIdentifierExpr();       // ID or Func call.
     }
@@ -332,10 +348,12 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     getNextToken(); // Consume ID;
 
     // If just an ID
-    if (curTok != tok_lparen)
+    if (curTok != tok_lparen) {
         return std::make_unique<VariableExprAST>(identifier);
+    }
 
     // If function call
+    printf("Parsing function call: %s\n", identifier.c_str());
     std::vector<std::unique_ptr<ExprAST>> argList;
     getNextToken(); // consume '('
 

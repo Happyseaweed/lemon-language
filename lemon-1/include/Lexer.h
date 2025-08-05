@@ -40,3 +40,5 @@ extern char curChar;
 
 int gettok();
 int getNextToken();
+int peakNextToken();
+std::string tokenToString(int token);

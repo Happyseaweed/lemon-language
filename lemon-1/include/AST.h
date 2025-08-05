@@ -9,6 +9,15 @@
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/Reassociate.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include "llvm/Transforms/Utils/Mem2Reg.h"
+#include <llvm/Support/TargetSelect.h>
+
+#include "./LemonJIT.h"
 
 #include <string>
 #include <vector>
@@ -16,6 +25,7 @@
 #include <map>
 
 using namespace llvm;
+using namespace llvm::orc;
 
 #pragma once
 
@@ -23,7 +33,7 @@ using namespace llvm;
 class ExprAST {
 public:
     virtual ~ExprAST() = default;
-    virtual Value *codegen(const std::string scope = "_global") = 0;
+    virtual Value *codegen(const std::string scope) = 0;
     virtual void showAST() = 0;
 };
 
@@ -31,7 +41,7 @@ public:
 class StmtAST {
 public:
     virtual ~StmtAST() = default;
-    virtual Value *codegen(const std::string scope = "_global") = 0;
+    virtual Value *codegen(const std::string scope) = 0;
     virtual void showAST() = 0;
 };
 
@@ -128,6 +138,7 @@ public:
         : varName(varName), defBody(std::move(defBody)) {}
 
     Value *codegen(const std::string scope) override;
+    Value *codegen_global();
     void showAST() override;
 };
 
@@ -175,17 +186,31 @@ public:
     void showAST() override;
 };
 
+class ExpressionStmtAST : public StmtAST {
+    std::unique_ptr<ExprAST> expr;
+public:
+    ExpressionStmtAST(std::unique_ptr<ExprAST> expr)
+        : expr(std::move(expr)) {}
+
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
 
 // Core Variables and Helper functions
 
 extern std::unique_ptr<LLVMContext> TheContext;
 extern std::unique_ptr<IRBuilder<>> Builder;
+extern std::unique_ptr<IRBuilder<>> GlobalVariableBuilder;
+extern std::unique_ptr<IRBuilder<>> MainBuilder;
+extern std::unique_ptr<IRBuilder<>> FunctionBuilder;
+
 extern std::unique_ptr<Module> TheModule;
 extern std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable; // Stores all variables
 extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 
 extern AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef varName);
-extern Function *getFunction(std::string name);
+extern Function *getFunction(std::string name, std::string scope = "_global");
 
 extern std::unique_ptr<FunctionPassManager> TheFPM;
 extern std::unique_ptr<LoopAnalysisManager> TheLAM;
@@ -194,3 +219,6 @@ extern std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
 extern std::unique_ptr<ModuleAnalysisManager> TheMAM;
 extern std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
 extern std::unique_ptr<StandardInstrumentations> TheSI;
+
+// JIT
+extern std::unique_ptr<LemonJIT> TheJIT;

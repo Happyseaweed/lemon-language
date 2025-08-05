@@ -52,6 +52,24 @@
         "variant": "cpp",
         "vector": "cpp",
         "algorithm": "cpp",
-        "cstddef": "cpp"
-    }
+        "cstddef": "cpp",
+        "__config": "cpp",
+        "__debug": "cpp",
+        "__errc": "cpp",
+        "__mutex_base": "cpp",
+        "__threading_support": "cpp",
+        "atomic": "cpp",
+        "charconv": "cpp",
+        "cinttypes": "cpp",
+        "condition_variable": "cpp",
+        "exception": "cpp",
+        "future": "cpp",
+        "ostream": "cpp",
+        "set": "cpp",
+        "shared_mutex": "cpp",
+        "system_error": "cpp",
+        "thread": "cpp",
+        "tuple": "cpp"
+    },
+    "cmake.sourceDirectory": "/Users/siweidu/Documents/Code/Projects/lemon-language/lemon-1"
 }

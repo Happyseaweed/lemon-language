@@ -2,6 +2,8 @@
 #include "../include/AST.h"
 #include "../include/Lexer.h"
 
+
+static ExitOnError ExitOnErr;
 // ============================================================================
 //          Mock "library" functions to be "extern'd" in user code
 // ============================================================================
@@ -28,6 +30,65 @@ extern "C" DLLEXPORT double printd(double X) {
 //                                  Main
 // ============================================================================
 
+void InitializeModule() {
+    // Open a new context and module.
+    TheContext = std::make_unique<LLVMContext>();
+    TheModule = std::make_unique<Module>("LEMON JIT", *TheContext);
+    TheModule->setDataLayout(TheJIT->getDataLayout());
+
+    // Create a new builder for the module.
+    Builder = std::make_unique<IRBuilder<>>(*TheContext);
+
+    // 3 insertion points.
+    GlobalVariableBuilder = std::make_unique<IRBuilder<>>(*TheContext);
+    MainBuilder = std::make_unique<IRBuilder<>>(*TheContext);
+    FunctionBuilder = std::make_unique<IRBuilder<>>(*TheContext);
+
+    // Make main func.
+    FunctionType *FT = 
+        FunctionType::get(Type::getDoubleTy(*TheContext), false);        
+    
+    Function *F =
+        Function::Create(FT, Function::ExternalLinkage, "_main", TheModule.get());
+    
+    BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", F);
+    MainBuilder->SetInsertPoint(BB);
+
+    // Optimizations
+    // TheFPM = std::make_unique<FunctionPassManager>();
+    // TheLAM = std::make_unique<LoopAnalysisManager>();
+    // TheFAM = std::make_unique<FunctionAnalysisManager>();
+    // TheCGAM = std::make_unique<CGSCCAnalysisManager>();
+    // TheMAM = std::make_unique<ModuleAnalysisManager>();
+
+    // ThePIC = std::make_unique<PassInstrumentationCallbacks>();
+    // TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
+    //                                                     /*DebugLogging*/ true);
+    // TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+    // Add transform passes.
+    // Do simple "peephole" optimizations and bit-twiddling optimizations.
+    // TheFPM->addPass(InstCombinePass());
+    // // Reassociate expressions.
+    // TheFPM->addPass(ReassociatePass());
+    // // Eliminate Common SubExpressions.
+    // TheFPM->addPass(GVNPass());
+    // // Simplify the control flow graph (deleting unreachable blocks, etc).
+    // TheFPM->addPass(SimplifyCFGPass());
+
+    // // mem2reg passes
+    // TheFPM->addPass(PromotePass());
+    // TheFPM->addPass(InstCombinePass());
+    // TheFPM->addPass(ReassociatePass());
+
+    // // // Register analysis passes used in these transform passes.
+    // PassBuilder PB;
+    // PB.registerModuleAnalyses(*TheMAM);
+    // PB.registerFunctionAnalyses(*TheFAM);
+    // PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
+}
+
+
 void runLemon() {
     getNextToken();
     while (true) {
@@ -35,30 +96,52 @@ void runLemon() {
 
         case tok_eof:
             return;
-        
-        case tok_func:
-            //?
-            break;
-        
-        case tok_extern:
-            //?
-            break;
 
         default:
             auto result = Parse();
             printf("Parsed\n");
             result->showAST();
-            break;
+            printf("\n\nIR DUMP=============================\n");
+            result->codegen();
+            MainBuilder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
+
+            TheModule->print(errs(), nullptr);
+            
+            printf("\n\n Executing JIT======================\n");
+            auto RT = TheJIT->getMainJITDylib().getDefaultResourceTracker();
+
+            auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+            
+            ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
+            InitializeModule();
+
+            auto ExprSymbol = ExitOnErr(TheJIT->lookup("_main"));
+
+            printf("11111\n");
+            double (*FP)() = ExprSymbol.toPtr<double (*)()>();
+            
+            fprintf(stderr, "Evaluated to %f\n", FP());
+
+            ExitOnErr(RT->remove());
+            return;
         }
     }
 }
 
 int main() {
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+    
     operatorPrecedence[tok_add] = 20;
     operatorPrecedence[tok_sub] = 30;
     operatorPrecedence[tok_mul] = 40;
     operatorPrecedence[tok_div] = 40;
-
+    
+    TheJIT = ExitOnErr(LemonJIT::Create());
+    
+    InitializeModule();
+    
     runLemon();
 
     return 0;
