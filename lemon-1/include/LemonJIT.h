@@ -24,9 +24,6 @@
 namespace llvm {
 namespace orc {
 
-
-// std::unique_function<std::unique_ptr<GetMemoryManager> >;
-
 class LemonJIT {
 private:
     std::unique_ptr<ExecutionSession> ES;

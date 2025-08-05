@@ -63,7 +63,6 @@ int gettok() {
         return tok_rbrace;
     }
     if (curChar == '(') {
-        printf("FUCK!\n");
         curChar = getchar();
         return tok_lparen;
     }
@@ -133,7 +132,6 @@ int peakNextToken() {
             fprintf(stderr, "🍋 (%c) Failed to ungetc curChar.", curChar);
         }
         for (auto it = nextTokStr.rbegin(); it != nextTokStr.rend(); ++it) {
-            printf("Putting back: '%c'\n", *it);
             if (ungetc(*it, stdin) == EOF) {
                 fprintf(stderr, "🍋 (%c) Failed to ungetc token char.", *it);
             }

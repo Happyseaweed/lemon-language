@@ -41,11 +41,15 @@ void dbug() {
 }
 
 Value *LemonAST::codegen(const std::string scope) {
-    fprintf(stderr, "Lemon Codegen Started\n");
+    fprintf(stderr, "# Lemon Codegen Started\n");
+    const int totalStatements = statements.size();
+    int i = 0;
     for (auto &statement : statements) {
-        auto *stmtIR = statement->codegen(scope);
-        // fprintf(stderr, "\n\nStatment IR: \n");
-        // if (stmtIR) stmtIR->print(errs());
+        Value *stmtVal = statement->codegen(scope);
+        if (i == totalStatements-1) {
+            MainBuilder->CreateRet(stmtVal);
+        }
+        i++;
     }
     return nullptr;
 }
@@ -236,7 +240,7 @@ Value *ExpressionStmtAST::codegen(const std::string scope) {
 }
 
 Function *PrototypeAST::codegen(const std::string scope) {
-    fprintf(stderr, "Prototype codegen called in: (%s)\n", scope.c_str());
+    // fprintf(stderr, "Prototype codegen called in: (%s)\n", scope.c_str());
     std::vector<Type*> doubles(args.size(), Type::getDoubleTy(*TheContext));
 
     FunctionType *FT = 
@@ -253,7 +257,7 @@ Function *PrototypeAST::codegen(const std::string scope) {
 }
 
 Value *FunctionAST::codegen(const std::string scope) {
-    fprintf(stderr, "Function Codegen\n");
+    // fprintf(stderr, "Function Codegen\n");
     // Should return Function *
     // But since Function class inherits from Value, it should be fine :)
     auto &p = *proto; // Save a ref to use later on in code
@@ -275,7 +279,6 @@ Value *FunctionAST::codegen(const std::string scope) {
         Builder->CreateStore(&arg, Alloca);
         
         SymbolTable[functionScope][arg.getName().str()] = Alloca;
-        // printf("Function: (%s) has argument: (%s)\n", proto->getName().c_str(), arg.getName().str().c_str());
     }
 
     // Generating body
@@ -289,14 +292,9 @@ Value *FunctionAST::codegen(const std::string scope) {
             }
         }
 
-        // for (auto &statement : functionBody) {
-        //     fprintf(stderr, "%s\n", functionScope.c_str());
-        //     Value *stmtVal = statement->codegen(functionScope);
-        //     // Check if statement is a return?
-        //     // Add return?
-        // }
         verifyFunction(*TheFunction);
 
+        // Optimizations, disabled for now. Will enable later.
         // TheFPM->run(*TheFunction, *TheFAM);
 
         return TheFunction;

@@ -16,6 +16,8 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include <llvm/Support/TargetSelect.h>
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
 
 #include "./LemonJIT.h"
 
@@ -195,7 +197,6 @@ public:
     Value *codegen(const std::string scope) override;
     void showAST() override;
 };
-
 
 // Core Variables and Helper functions
 

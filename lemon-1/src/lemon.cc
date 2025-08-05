@@ -55,37 +55,37 @@ void InitializeModule() {
     MainBuilder->SetInsertPoint(BB);
 
     // Optimizations
-    // TheFPM = std::make_unique<FunctionPassManager>();
-    // TheLAM = std::make_unique<LoopAnalysisManager>();
-    // TheFAM = std::make_unique<FunctionAnalysisManager>();
-    // TheCGAM = std::make_unique<CGSCCAnalysisManager>();
-    // TheMAM = std::make_unique<ModuleAnalysisManager>();
+    TheFPM = std::make_unique<FunctionPassManager>();
+    TheLAM = std::make_unique<LoopAnalysisManager>();
+    TheFAM = std::make_unique<FunctionAnalysisManager>();
+    TheCGAM = std::make_unique<CGSCCAnalysisManager>();
+    TheMAM = std::make_unique<ModuleAnalysisManager>();
 
-    // ThePIC = std::make_unique<PassInstrumentationCallbacks>();
-    // TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
-    //                                                     /*DebugLogging*/ true);
-    // TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+    ThePIC = std::make_unique<PassInstrumentationCallbacks>();
+    TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
+                                                        /*DebugLogging*/ true);
+    TheSI->registerCallbacks(*ThePIC, TheMAM.get());
 
     // Add transform passes.
     // Do simple "peephole" optimizations and bit-twiddling optimizations.
-    // TheFPM->addPass(InstCombinePass());
-    // // Reassociate expressions.
-    // TheFPM->addPass(ReassociatePass());
-    // // Eliminate Common SubExpressions.
-    // TheFPM->addPass(GVNPass());
-    // // Simplify the control flow graph (deleting unreachable blocks, etc).
-    // TheFPM->addPass(SimplifyCFGPass());
+    TheFPM->addPass(InstCombinePass());
+    // Reassociate expressions.
+    TheFPM->addPass(ReassociatePass());
+    // Eliminate Common SubExpressions.
+    TheFPM->addPass(GVNPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    TheFPM->addPass(SimplifyCFGPass());
 
-    // // mem2reg passes
-    // TheFPM->addPass(PromotePass());
-    // TheFPM->addPass(InstCombinePass());
-    // TheFPM->addPass(ReassociatePass());
+    // mem2reg passes
+    TheFPM->addPass(PromotePass());
+    TheFPM->addPass(InstCombinePass());
+    TheFPM->addPass(ReassociatePass());
 
-    // // // Register analysis passes used in these transform passes.
-    // PassBuilder PB;
-    // PB.registerModuleAnalyses(*TheMAM);
-    // PB.registerFunctionAnalyses(*TheFAM);
-    // PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
+    // Register analysis passes used in these transform passes.
+    PassBuilder PB;
+    PB.registerModuleAnalyses(*TheMAM);
+    PB.registerFunctionAnalyses(*TheFAM);
+    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 }
 
 
@@ -99,17 +99,25 @@ void runLemon() {
 
         default:
             auto result = Parse();
-            printf("Parsed\n");
-            result->showAST();
-            printf("\n\nIR DUMP=============================\n");
-            result->codegen();
-            MainBuilder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
-
-            TheModule->print(errs(), nullptr);
             
-            printf("\n\n Executing JIT======================\n");
-            auto RT = TheJIT->getMainJITDylib().getDefaultResourceTracker();
+            // result->showAST(); // Print AST for debugging.
+            result->codegen();
 
+            // MainBuilder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
+            
+            std::error_code EC;
+            raw_fd_ostream out("./output.ll", EC, sys::fs::OF_None);
+
+            if (EC) {
+                errs() << "Error opening file: " << EC.message() << "\n";
+                return;
+            }
+
+            TheModule->print(out, nullptr);
+           
+            // JIT Execution (using this as "AOT" compiler for now...)
+            fprintf(stderr, "🍋 Lemon Executing...\n");
+            auto RT = TheJIT->getMainJITDylib().getDefaultResourceTracker();
             auto TSM = ThreadSafeModule(std::move(TheModule), std::move(TheContext));
             
             ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
@@ -117,7 +125,6 @@ void runLemon() {
 
             auto ExprSymbol = ExitOnErr(TheJIT->lookup("_main"));
 
-            printf("11111\n");
             double (*FP)() = ExprSymbol.toPtr<double (*)()>();
             
             fprintf(stderr, "Evaluated to %f\n", FP());

@@ -90,9 +90,8 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseExtern();
         
         default:
-            return nullptr;
-            // fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
-            // return LogErrorS("Unknown token when parsing statement.");
+            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
+            return LogErrorS("Unknown token when parsing statement.");
     }
 }
 
@@ -224,18 +223,13 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
     if (curTok != tok_rparen) {
         while(true) {
             // Args must be IDs or calls.
-            //! NOTE: Be careful for externs. No function call in arg list.
+            //! NOTE: Be careful for externs. Not allowed to have function call expr in arg list.
 
             if (curTok != tok_id) 
                 return LogErrorP("Expected ID or ID() in function signature argument list.");
 
             argList.push_back(idStr);
             getNextToken();                
-            // if (auto E = ParseIdentifierExpr()) {
-            //     argList.push_back(std::move(E));
-            // } else {
-            //     return nullptr;
-            // }
 
             if (curTok == tok_rparen)
                 break;
@@ -315,7 +309,7 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int precedence, std::unique_ptr<ExprAST> 
 }
 
 std::unique_ptr<ExprAST> ParseFactor() {
-    printf("Parsing Factor: curTok: %d\n", curTok);
+    // printf("Parsing Factor: curTok: %d\n", curTok);
 
     if (curTok == tok_id) {
         return ParseIdentifierExpr();       // ID or Func call.
@@ -353,7 +347,7 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     }
 
     // If function call
-    printf("Parsing function call: %s\n", identifier.c_str());
+    // printf("Parsing function call: %s\n", identifier.c_str());
     std::vector<std::unique_ptr<ExprAST>> argList;
     getNextToken(); // consume '('
 
@@ -381,9 +375,3 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     
     return std::make_unique<CallExprAST>(identifier, std::move(argList));
 }
-
-
-
-
-
-

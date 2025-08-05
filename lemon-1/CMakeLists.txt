@@ -38,36 +38,10 @@ add_executable(lemon ${SOURCES})
 # are on another architecture.
 
 llvm_map_components_to_libnames(LLVM_LIBS
-  # orcjit
-  # executionengine
-  # jitlink
-  # native
-
-
-  core
-  native
-  nativecodegen
   orcjit
   executionengine
   jitlink
-  passes
-  transformutils
-  analysis
-  asmparser
-  asmprinter
-  target
-  irreader
-  support
-  mc
-  mcjit
-  mcparser
-  AArch64
-  AArch64AsmParser
-  AArch64CodeGen
-  AArch64Desc
-  AArch64Disassembler
-  AArch64Info
-  AArch64Utils
+  native
 )
 
 target_link_libraries(lemon ${LLVM_LIBS})
