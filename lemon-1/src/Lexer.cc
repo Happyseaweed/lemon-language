@@ -93,6 +93,44 @@ int gettok() {
         return tok_div;
     }
 
+    // Comparison ops, need to peak next char.
+    if (curChar == '<') {
+        char peakChar = getchar();
+        if (peakChar == '=') {
+            curChar = getchar();
+            return tok_le;
+        }
+        curChar = peakChar;
+        return tok_lt;
+    }
+    if (curChar == '>') {
+        char peakChar = getchar();
+        if (peakChar == '=') {
+            curChar = getchar();
+            return tok_ge;
+        }
+        curChar = peakChar;
+        return tok_gt;
+    }
+    if (curChar == '=') {
+        char peakChar = getchar();
+        if (peakChar == '=') {
+            curChar = getchar();
+            return tok_eq;
+        }
+        curChar = peakChar;
+        return tok_assign;
+    }
+    if (curChar == '!') {
+        char peakChar = getchar();
+        if (peakChar == '=') {
+            curChar = getchar();
+            return tok_neq;
+        }
+        // put it back because now '!' is undefined op (for now...)
+        ungetc(peakChar, stdin);
+    }
+
     // Special symbols
     if (curChar == ';') {
         curChar = getchar();
@@ -101,10 +139,6 @@ int gettok() {
     if (curChar == ',') {
         curChar = getchar();
         return tok_comma;
-    }
-    if (curChar == '=') {
-        curChar = getchar();
-        return tok_equal;
     }
 
     // EOF
@@ -161,7 +195,7 @@ std::string tokenToString(int token) {
         return "}";
     case tok_comma:
         return ",";
-    case tok_equal:
+    case tok_assign:
         return "=";
     case tok_semi:
         return ";";
@@ -187,6 +221,18 @@ std::string tokenToString(int token) {
         return "if";
     case tok_else:
         return "else";
+    case tok_lt:
+        return "<";
+    case tok_gt:
+        return ">";
+    case tok_le:
+        return "<=";
+    case tok_ge:
+        return ">=";
+    case tok_eq:
+        return "==";
+    case tok_neq:
+        return "!=";
     default:
         return "Unknown Token";
     }

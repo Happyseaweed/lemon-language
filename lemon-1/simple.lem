@@ -1,26 +1,17 @@
 extern printd(x);
 
-var iitt = 0;
 
+printd(1);
 
-func init() {
-    iitt = iitt + 1;
+func add(x, y) {
+    var sum = x + y;
+    return sum;
 }
 
-var one = init();
-var two = init();
-var three = init();
-var four = init();
-var five = init();
+printd(add(1,1));
+var dum = 13;
 
-printd(69);
+var test = (1*2*dum)+(2*dum*1);
+printd(test);
 
-func exec() {
-    printd(one);
-    printd(two);
-    printd(three);
-    printd(four);
-    printd(five);
-}
-
-exec();
+test = (1*2*dum)+(2*dum*1) + 3;

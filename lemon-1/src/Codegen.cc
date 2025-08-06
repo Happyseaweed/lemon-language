@@ -73,6 +73,22 @@ Value *BinaryExprAST::codegen(const std::string scope) {
         return TmpBuilder->CreateFMul(L, R, "multmp");
     case tok_div:
         return TmpBuilder->CreateFDiv(L, R, "divtmp");
+    case tok_lt:
+        L = TmpBuilder->CreateFCmpULT(L, R, "cmptmp_lt");
+        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_lt");
+    case tok_gt:
+        L = TmpBuilder->CreateFCmpUGT(L, R, "cmptmp_gt");
+        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_gt");
+    case tok_le:
+        L = TmpBuilder->CreateFCmpULE(L, R, "cmptmp_le");
+        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_le");
+    case tok_ge:
+        L = TmpBuilder->CreateFCmpUGE(L, R, "cmptmp_ge");
+        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_ge");
+    case tok_eq:
+        L = TmpBuilder->CreateFCmpUEQ(L, R, "cmptmp_eq");
+        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_eq");
+
     default:
         return LogErrorV("Invalid Binary Operator.");
     }
@@ -92,6 +108,8 @@ Value *VariableExprAST::codegen(const std::string scope) {
         return Builder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
     }
     else if (GV) {
+        if (scope == "_global")
+            return MainBuilder->CreateLoad(GV->getValueType(), GV, varName.c_str());
         return Builder->CreateLoad(GV->getValueType(), GV, varName.c_str());
     }
     std::string errorStr = "Unknown variable name (" + varName + ") referenced in Scope: (" + scope + ").";
@@ -199,14 +217,21 @@ Value *VariableDeclStmt::codegen_global() {
         Builder->CreateRetVoid();
 
         swap(TmpBuilder, Builder); // Swap back the old builder.
+        
+        // Optimizations
+        TheFPM->run(*F, *TheFAM);
 
         // llvm::appendToGlobalCtors 
         // Referenced from: https://llvm.org/doxygen/ModuleUtils_8h.html
-
         appendToGlobalCtors(*TheModule, F, nextGlobalPriority++);
 
         // Add it to table
         GlobalVariables[varName] = GV;
+        
+        // Call init function in main
+        std::string initFuncName = initFuncScope;
+        Function *calleeF = getFunction(initFuncName);  // Should get directly from TheModule
+        MainBuilder->CreateCall(calleeF, std::vector<Value*>(), "init_calltmp");
     }
 
     return GV;
@@ -234,7 +259,8 @@ Value *AssignmentStmt::codegen(const std::string scope) {
 }
 
 Value *ReturnStmtAST::codegen(const std::string scope) {
-    return nullptr;
+    Value *retV = retBody->codegen(scope);
+    return retV;
 }
 
 Value *ExpressionStmtAST::codegen(const std::string scope) {
@@ -246,6 +272,10 @@ Value *IfStmtAST::codegen(const std::string scope) {
 
     if (!condV)
         return nullptr;
+    
+    // TODO: Need a better way to handle builders... this is tedious!
+    if (scope == "_global")             
+        swap(Builder, MainBuilder);
 
     condV = Builder->CreateFCmpONE(
         condV, 
@@ -266,11 +296,17 @@ Value *IfStmtAST::codegen(const std::string scope) {
     // Emitting THEN block
     Builder->SetInsertPoint(ThenBB);
 
-    for (auto &stmt : thenBody) {
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
+        for (auto &stmt : thenBody) {
         Value *thenStmtV = stmt->codegen(scope);
         if (!thenStmtV)
             return nullptr;
     }
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
 
     // After THEN block, jump to MergeBB
     Builder->CreateBr(MergeBB);
@@ -280,12 +316,18 @@ Value *IfStmtAST::codegen(const std::string scope) {
     TheFunction->insert(TheFunction->end(), ElseBB);
     Builder->SetInsertPoint(ElseBB);
 
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
     for (auto &stmt : elseBody) {
         Value *elseStmtV = stmt->codegen(scope);
         if (!elseStmtV)
             return nullptr;
     }
 
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
     Builder->CreateBr(MergeBB);
     ElseBB = Builder->GetInsertBlock(); // Update ElseBB
 
@@ -298,6 +340,9 @@ Value *IfStmtAST::codegen(const std::string scope) {
 
     PN->addIncoming(ConstantFP::get(*TheContext, APFloat(0.0)), ThenBB);
     PN->addIncoming(ConstantFP::get(*TheContext, APFloat(0.0)), ElseBB);
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
     
     return PN;
 }
@@ -349,16 +394,17 @@ Value *FunctionAST::codegen(const std::string scope) {
         for (int i = 0; i < functionBody.size(); ++i) {
             Value *stmtVal = functionBody[i]->codegen(functionScope);
 
-            // Assume a return is last statement...
-            if (i == functionBody.size() - 1) {
-                Builder->CreateRet(stmtVal);    
+            // Check if is return statement:
+            if (ReturnStmtAST* dPtr = dynamic_cast<ReturnStmtAST*>(functionBody[i].get())) {
+                Builder->CreateRet(stmtVal);
             }
         }
+        Builder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
 
         verifyFunction(*TheFunction);
 
-        // Optimizations, disabled for now. Will enable later.
-        // TheFPM->run(*TheFunction, *TheFAM);
+        // Optimizations
+        TheFPM->run(*TheFunction, *TheFAM);
 
         return TheFunction;
     }

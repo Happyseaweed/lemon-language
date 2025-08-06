@@ -31,6 +31,8 @@ extern "C" DLLEXPORT double printd(double X) {
 //                                  Main
 // ============================================================================
 
+int REPL_MODE = 0;
+
 void InitializeModule() {
     // Open a new context and module.
     TheContext = std::make_unique<LLVMContext>();
@@ -71,6 +73,9 @@ void InitializeModule() {
     TheFPM->addPass(PromotePass());
     TheFPM->addPass(InstCombinePass());
     TheFPM->addPass(ReassociatePass());
+
+    // ADCE passes
+    TheFPM->addPass(ADCEPass());
 
     // Register analysis passes used in these transform passes.
     PassBuilder PB;
@@ -138,7 +143,10 @@ void runLemon() {
             
             // result->showAST(); // Print AST for debugging.
             result->codegen();
-           
+            
+            // Optimizations:
+            TheFPM->run(*F, *TheFAM);
+            
             // Saving LLVM IR to a file.
             std::error_code EC;
             raw_fd_ostream out("./output.ll", EC, sys::fs::OF_None);
@@ -163,8 +171,9 @@ void runLemon() {
             ExitOnErr(TheJIT->addModule(std::move(TSM), RT));
             InitializeModule();
 
-            // Run global constructors to initialize global variables, before main().
-            runGlobalConstructors(GlobalConstructorFunctions);
+            // Run global constructors to initialize global variables, before lemon_main.
+            // DEPRECATED, now calling inits() in lemon_main
+            // runGlobalConstructors(GlobalConstructorFunctions);
 
             // Executing main()
             auto ExprSymbol = ExitOnErr(TheJIT->lookup("lemon_main"));
@@ -181,11 +190,47 @@ void runLemon() {
     }
 }
 
-int main() {
+void runLemonREPL() {
+    fprintf(stderr, "LEMON> ");
+    getNextToken();
+    while (true) {
+        switch (curTok) {
+        case tok_eof:
+            break;
+        
+        default:
+            auto curLine = Parse();
+
+            // Make current block function
+            FunctionType *FT =
+                FunctionType::get(Type::getDoubleTy(*TheContext), false);
+            Function *F =
+                Function::Create(FT, Function::ExternalLinkage, "lemon_block", TheModule.get());
+            
+            BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", F);
+            
+            // TBC
+        }
+    }
+}
+
+int main(int argc, char **argv) {
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
     
+    if (argc > 1 && *argv[1] == '1') {
+        REPL_MODE = 1;
+    }
+    
+    // comparison ops
+    operatorPrecedence[tok_lt] = 10; 
+    operatorPrecedence[tok_gt] = 10; 
+    operatorPrecedence[tok_le] = 10; 
+    operatorPrecedence[tok_ge] = 10; 
+    operatorPrecedence[tok_eq] = 10;
+
+    // expr ops
     operatorPrecedence[tok_add] = 20;
     operatorPrecedence[tok_sub] = 30;
     operatorPrecedence[tok_mul] = 40;
@@ -195,7 +240,10 @@ int main() {
     
     InitializeModule();
     
-    runLemon();
+    if (REPL_MODE)
+        runLemonREPL();
+    else
+        runLemon();
 
     return 0;
 }

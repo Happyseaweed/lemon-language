@@ -16,7 +16,7 @@ enum Token {
     tok_rbrace = -6,
 
     tok_comma = -7,
-    tok_equal = -8,
+    tok_assign = -8,
     tok_semi = -9,
     tok_return = -10,
     
@@ -33,7 +33,14 @@ enum Token {
     tok_extern = -18,
 
     tok_if = -19,
-    tok_else = -20
+    tok_else = -20,
+
+    tok_lt = -21,
+    tok_gt = -22,
+    tok_le = -23,
+    tok_ge = -24,
+    tok_eq = -25,
+    tok_neq = -26
 };
 
 extern std::string idStr;

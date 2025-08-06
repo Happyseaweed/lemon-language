@@ -123,7 +123,7 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
     varName = idStr;
     getNextToken(); // Consume ID
 
-    if (curTok != tok_equal)
+    if (curTok != tok_assign)
         return LogErrorS("Expected '=' in variable declaration statement.");
     getNextToken(); // Consume '='
         
@@ -141,7 +141,7 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
 std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
     int peakedToken = peakNextToken();
 
-    if (peakedToken == tok_equal) {
+    if (peakedToken == tok_assign) {
         return ParseVariableAssign();
     }
     else if (peakedToken == tok_lparen) {
@@ -162,7 +162,7 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
     std::string varName = idStr;
     getNextToken(); // consume ID
 
-    if (curTok != tok_equal)
+    if (curTok != tok_assign)
         return LogErrorS("Expected '=' in variable assignment statement.");
     getNextToken();
 
