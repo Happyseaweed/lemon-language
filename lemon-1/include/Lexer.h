@@ -30,7 +30,10 @@ enum Token {
     tok_id = -16,
     tok_num = -17,
     
-    tok_extern = -18
+    tok_extern = -18,
+
+    tok_if = -19,
+    tok_else = -20
 };
 
 extern std::string idStr;

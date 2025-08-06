@@ -198,6 +198,22 @@ public:
     void showAST() override;
 };
 
+class IfStmtAST : public StmtAST {
+    std::unique_ptr<ExprAST> cond;
+    std::vector<std::unique_ptr<StmtAST>> thenBody;
+    std::vector<std::unique_ptr<StmtAST>> elseBody;
+
+public:
+    IfStmtAST(std::unique_ptr<ExprAST> cond,
+              std::vector<std::unique_ptr<StmtAST>> thenBody,
+              std::vector<std::unique_ptr<StmtAST>> elseBody)
+        : cond(std::move(cond)), thenBody(std::move(thenBody)), 
+          elseBody(std::move(elseBody)) {}
+    
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
 // Core Variables and Helper functions
 
 extern std::unique_ptr<LLVMContext> TheContext;

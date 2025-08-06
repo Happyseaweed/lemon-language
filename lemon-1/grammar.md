@@ -54,3 +54,29 @@ func test() {
 
 test();
 ```
+
+---
+
+# Control Flows:
+### if/else statement: 
+```
+if (expr) {
+    stmtList;
+} else {
+    stmtList;
+}
+```
+
+### for loops:
+```
+for (i = 0, i < n, 1.0) {
+    stmtList;
+}
+```
+
+### while loops:
+```
+while (expr) {
+    stmtList;
+}
+```

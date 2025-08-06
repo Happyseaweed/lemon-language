@@ -84,6 +84,8 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseVariableDecl();
         case tok_id:
             return ParseVariableAssignOrFunctionCall();
+        case tok_if:
+            return ParseIfStmt();
         case tok_func:
             return ParseFunction();
         case tok_extern:
@@ -257,6 +259,48 @@ std::unique_ptr<StmtAST> ParseExtern() {
     getNextToken(); // Consume ';'
     
     return std::make_unique<ExternAST>(std::move(proto));
+}
+
+std::unique_ptr<StmtAST> ParseIfStmt() {
+    getNextToken(); // Consume 'if'
+        
+    if (curTok != tok_lparen)
+        return LogErrorS("Expected '(' after 'if' keyword.");
+    getNextToken(); // Consume '('
+
+    auto cond = ParseExpression();
+    if (!cond)
+        return LogErrorS("Expected expression after 'if'.");
+    
+    if (curTok != tok_rparen)
+        return LogErrorS("Expected ')' after 'if' condition.");
+    getNextToken(); // Consume ')'
+
+    if (curTok != tok_lbrace)
+        return LogErrorS("Expected '{' after 'if' condition.");
+    getNextToken(); // Consume '{'
+
+    auto thenBody = ParseStatementList();
+    if (curTok != tok_rbrace)
+        return LogErrorS("Expected '}' after 'if' body.");
+    getNextToken(); // Consume '}'
+    
+    // If no else statement, return if stmtAST with empty body
+    if (curTok != tok_else) 
+        return std::make_unique<IfStmtAST>(std::move(cond), std::move(thenBody), std::vector<std::unique_ptr<StmtAST>>());
+
+    getNextToken(); // Consume 'else'
+
+    if (curTok != tok_lbrace)
+        return LogErrorS("Expected '{' after 'else' keyword.");
+    getNextToken(); // Consume '{'
+
+    auto elseBody = ParseStatementList();
+    if (curTok != tok_rbrace)
+        return LogErrorS("Expected '}' after 'else' body.");
+    getNextToken(); // Consume '}'
+
+    return std::make_unique<IfStmtAST>(std::move(cond), std::move(thenBody), std::move(elseBody));
 }
 
 // ============================================================================

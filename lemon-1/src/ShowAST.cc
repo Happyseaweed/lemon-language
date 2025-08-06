@@ -83,3 +83,20 @@ void ExpressionStmtAST::showAST() {
     expr->showAST();
     printf("\n");
 }
+
+void IfStmtAST::showAST() {
+    printf("If Statement: \n");
+    printf("Condition: ");
+    cond->showAST();
+    printf("\nThen Body: \n");
+    for (auto &stmt : thenBody) {
+        stmt->showAST();
+    }
+    if (elseBody.size() > 0) {
+        printf("Else Body: \n");
+        for (auto &stmt : elseBody) {
+            stmt->showAST();
+        }
+    }
+    printf("End If\n");
+}

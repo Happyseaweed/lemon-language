@@ -92,7 +92,6 @@ public:
     Value *codegen() override;
 };
 
-
 // ============================================================================
 class IfExprAST : public ExprAST {
     std::unique_ptr<ExprAST> Cond, Then, Else;
@@ -103,7 +102,6 @@ public:
     
     Value *codegen() override;
 };
-
 
 // ============================================================================
 class ForExprAST : public ExprAST {

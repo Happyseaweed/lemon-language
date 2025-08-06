@@ -25,7 +25,11 @@ int gettok() {
             return tok_extern;
         if (idStr == "return")
             return tok_return;
-        
+        if (idStr == "if")
+            return tok_if;
+        if (idStr == "else")
+            return tok_else;
+
         // Not keyword
         return tok_id; 
     }
@@ -179,6 +183,10 @@ std::string tokenToString(int token) {
         return std::to_string(numVal);
     case tok_extern:
         return "extern";
+    case tok_if:
+        return "if";
+    case tok_else:
+        return "else";
     default:
         return "Unknown Token";
     }

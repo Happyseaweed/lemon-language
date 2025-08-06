@@ -101,6 +101,8 @@ public:
     Expected<ExecutorSymbolDef> lookup(StringRef Name) {
         return ES->lookup({&MainJD}, Mangle(Name.str()));
     }
+
+    ExecutionSession& getExecutionSession() { return *ES; }
 };
 
 

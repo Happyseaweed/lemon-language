@@ -172,7 +172,7 @@ Value *VariableDeclStmt::codegen_global() {
         // Internal linkage, no need for cross-module
         Function *F = Function::Create(
             FT, 
-            Function::InternalLinkage,     
+            Function::ExternalLinkage,     
             initFuncScope, 
             TheModule.get()
         );
@@ -237,6 +237,67 @@ Value *ReturnStmtAST::codegen(const std::string scope) {
 
 Value *ExpressionStmtAST::codegen(const std::string scope) {
     return expr->codegen(scope);
+}
+
+Value *IfStmtAST::codegen(const std::string scope) {
+    Value *condV = cond->codegen(scope);
+
+    if (!condV)
+        return nullptr;
+
+    condV = Builder->CreateFCmpONE(
+        condV, 
+        ConstantFP::get(*TheContext, APFloat(0.0)), 
+        "ifcond"
+    );
+
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+    BasicBlock *ThenBB = 
+        BasicBlock::Create(*TheContext, "then", TheFunction);
+    BasicBlock *ElseBB = 
+        BasicBlock::Create(*TheContext, "else");
+    BasicBlock *MergeBB = 
+        BasicBlock::Create(*TheContext, "ifcont");
+    
+    Builder->CreateCondBr(condV, ThenBB, ElseBB);
+
+    // Emitting THEN block
+    Builder->SetInsertPoint(ThenBB);
+
+    for (auto &stmt : thenBody) {
+        Value *thenStmtV = stmt->codegen(scope);
+        if (!thenStmtV)
+            return nullptr;
+    }
+
+    // After THEN block, jump to MergeBB
+    Builder->CreateBr(MergeBB);
+    ThenBB = Builder->GetInsertBlock(); // Update ThenBB
+
+    // Emitting ELSE block
+    TheFunction->insert(TheFunction->end(), ElseBB);
+    Builder->SetInsertPoint(ElseBB);
+
+    for (auto &stmt : elseBody) {
+        Value *elseStmtV = stmt->codegen(scope);
+        if (!elseStmtV)
+            return nullptr;
+    }
+
+    Builder->CreateBr(MergeBB);
+    ElseBB = Builder->GetInsertBlock(); // Update ElseBB
+
+    TheFunction->insert(TheFunction->end(), MergeBB);
+    Builder->SetInsertPoint(MergeBB);
+
+    // Phinodes:
+    PHINode *PN = 
+        Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
+
+    PN->addIncoming(ConstantFP::get(*TheContext, APFloat(0.0)), ThenBB);
+    PN->addIncoming(ConstantFP::get(*TheContext, APFloat(0.0)), ElseBB);
+    
+    return PN;
 }
 
 Function *PrototypeAST::codegen(const std::string scope) {
