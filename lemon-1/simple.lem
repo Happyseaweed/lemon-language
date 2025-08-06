@@ -13,6 +13,8 @@ var three = init();
 var four = init();
 var five = init();
 
+printd(69);
+
 func exec() {
     printd(one);
     printd(two);

@@ -87,6 +87,8 @@ Value *VariableExprAST::codegen(const std::string scope) {
     GlobalVariable* GV = GlobalVariables[varName];
 
     if (A) {
+        if (scope == "_global")
+            return MainBuilder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
         return Builder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
     }
     else if (GV) {
