@@ -1,0 +1,24 @@
+extern printd(x);
+
+var iitt = 0;
+
+
+func init() {
+    iitt = iitt + 1;
+}
+
+var one = init();
+var two = init();
+var three = init();
+var four = init();
+var five = init();
+
+func exec() {
+    printd(one);
+    printd(two);
+    printd(three);
+    printd(four);
+    printd(five);
+}
+
+exec();
