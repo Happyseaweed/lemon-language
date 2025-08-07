@@ -1,6 +1,8 @@
 # lemon-language
 Lemon programming language
 
+WIP
+
 Lemon is a simple programming language built around tensor ops and leverages LLVM to optimize and compile.
 
 The goal is: 
