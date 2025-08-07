@@ -90,10 +90,13 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseFunction();
         case tok_extern:
             return ParseExtern();
+        case tok_for:
+            return ParseForStmt();
         
         default:
-            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
-            return LogErrorS("Unknown token when parsing statement.");
+            return nullptr;
+            // fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
+            // return LogErrorS("Unknown token when parsing statement.");
     }
 }
 
@@ -301,6 +304,64 @@ std::unique_ptr<StmtAST> ParseIfStmt() {
     getNextToken(); // Consume '}'
 
     return std::make_unique<IfStmtAST>(std::move(cond), std::move(thenBody), std::move(elseBody));
+}
+
+std::unique_ptr<StmtAST> ParseForStmt() {
+    // for (start, end, step) { stmt_list }
+    std::string iterator = "";
+    getNextToken(); // Consume 'for';
+
+    if (curTok != tok_lparen)
+        return LogErrorS("Expected '(' in for loop definition");
+    getNextToken(); // consume '('
+
+    if (curTok != tok_id)
+        return LogErrorS("Expected iterator ID in for loop definition.");
+    iterator = idStr;
+    getNextToken(); // Consume ID
+
+    if (curTok != tok_assign)
+        return LogErrorS("Expected '=' in for loop start definition.");
+    getNextToken(); // consume '=';
+    
+    auto start = ParseExpression();
+    if (!start)
+        return nullptr;
+    
+    if (curTok != tok_comma)    
+        return LogErrorS("Expected separator ',' after for loop start definition.");
+    getNextToken(); // Consume ','
+
+    auto end = ParseExpression(); 
+    if (!end)
+        return nullptr;
+    
+    // Optional step value, default is 1.0
+    std::unique_ptr<ExprAST> step;
+    if (curTok == tok_comma) {
+        getNextToken(); // consume ','
+        step = ParseExpression();
+        if (!step)
+            return nullptr;
+    } else {
+        step = std::make_unique<NumberExprAST>(1.0);
+    }
+
+    if (curTok != tok_rparen) 
+        return LogErrorS("Expected ')' after for loop definition.");
+    getNextToken(); // consume ')';
+
+    if (curTok != tok_lbrace)
+        return LogErrorS("Expected '{' in for loop body definition.");
+    getNextToken();
+
+    auto forBody = ParseStatementList();
+
+    if (curTok != tok_rbrace)
+        return LogErrorS("Expected '}' closing brace in for loop body definition.");
+    getNextToken();
+        
+    return std::make_unique<ForStmtAST>(iterator, std::move(start), std::move(end), std::move(step), std::move(forBody));
 }
 
 // ============================================================================

@@ -40,7 +40,9 @@ enum Token {
     tok_le = -23,
     tok_ge = -24,
     tok_eq = -25,
-    tok_neq = -26
+    tok_neq = -26,
+
+    tok_for = -27
 };
 
 extern std::string idStr;

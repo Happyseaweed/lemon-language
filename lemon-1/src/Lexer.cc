@@ -29,6 +29,8 @@ int gettok() {
             return tok_if;
         if (idStr == "else")
             return tok_else;
+        if (idStr == "for")
+            return tok_for;
 
         // Not keyword
         return tok_id; 
@@ -233,6 +235,8 @@ std::string tokenToString(int token) {
         return "==";
     case tok_neq:
         return "!=";
+    case tok_for:
+        return "for";
     default:
         return "Unknown Token";
     }

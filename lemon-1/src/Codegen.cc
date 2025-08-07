@@ -41,7 +41,7 @@ void dbug() {
 }
 
 Value *LemonAST::codegen(const std::string scope) {
-    fprintf(stderr, "# Lemon Codegen Started\n");
+    // fprintf(stderr, "# Lemon Codegen Started\n");
     const int totalStatements = statements.size();
     int i = 0;
     for (auto &statement : statements) {
@@ -134,8 +134,10 @@ Value *CallExprAST::codegen(const std::string scope) {
             return nullptr;
         argsValue.push_back(evaluated);
     }
-    if (scope == "_global")
+
+    if (scope == "_global") {
         return MainBuilder->CreateCall(calleeF, argsValue, "calltmp");
+    }
 
     return Builder->CreateCall(calleeF, argsValue, "calltmp");
 }
@@ -223,7 +225,8 @@ Value *VariableDeclStmt::codegen_global() {
 
         // llvm::appendToGlobalCtors 
         // Referenced from: https://llvm.org/doxygen/ModuleUtils_8h.html
-        appendToGlobalCtors(*TheModule, F, nextGlobalPriority++);
+        // DEACTIVATED, currently init'ing global vars via function calls in lemon_main
+        // appendToGlobalCtors(*TheModule, F, nextGlobalPriority++);
 
         // Add it to table
         GlobalVariables[varName] = GV;
@@ -299,7 +302,7 @@ Value *IfStmtAST::codegen(const std::string scope) {
     if (scope == "_global")
         swap(Builder, MainBuilder);
     
-        for (auto &stmt : thenBody) {
+    for (auto &stmt : thenBody) {
         Value *thenStmtV = stmt->codegen(scope);
         if (!thenStmtV)
             return nullptr;
@@ -345,6 +348,91 @@ Value *IfStmtAST::codegen(const std::string scope) {
         swap(Builder, MainBuilder);
     
     return PN;
+}
+
+Value *ForStmtAST::codegen(const std::string scope) {
+    // if global scope, generate local vars within main
+    // if in func scope, generate local vars within func
+
+    // Check against local vars first, if same name exists, use it.
+    // Otherwise create new local var. 
+    // lemon_main should have NO local-only variables, other than global vars 
+
+    // inits start
+    // checks cond
+    // loop:
+    //      loop stuff
+    //      checks cond
+    // afterloop:
+    //
+
+    // Create iterator variable.
+    Value *startV = start->codegen(scope);
+    if (!startV)
+        return nullptr;
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
+    // Get parent block
+    Function* F = Builder->GetInsertBlock()->getParent();
+    
+    AllocaInst *Alloca = CreateEntryBlockAlloca(F, iterator);
+    Builder->CreateStore(startV, Alloca);
+
+    // Basic blocks
+    BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", F);
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterloop", F);
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
+        // Calculate step value
+    Value *stepVal = step->codegen(scope);
+
+
+    // Evaluate expression to a value
+    Value *endVal = end->codegen(scope);
+    if (!endVal)
+        return nullptr;
+
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+
+    // Compare current value & branch
+    Value *curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
+    Value *endCond = Builder->CreateFCmpULT(curVal, endVal, "loopcond");
+    Builder->CreateCondBr(endCond, LoopBB, AfterBB);
+
+    // Loop body:
+    Builder->SetInsertPoint(LoopBB);
+
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+    
+    for (auto &stmt : forBody) {
+        stmt->codegen(scope);
+    }
+    
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+
+    // Increment iterator
+    curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
+    Value *nextVal = Builder->CreateFAdd(curVal, stepVal, "nextval");
+    Builder->CreateStore(nextVal, Alloca);
+    
+    // Check termination condition
+    endCond = Builder->CreateFCmpULT(nextVal, endVal, "loopcond");
+    Builder->CreateCondBr(endCond, LoopBB, AfterBB);
+
+    Builder->SetInsertPoint(AfterBB);
+
+    if (scope == "_global")
+        swap(Builder, MainBuilder);
+
+    return nullptr;
 }
 
 Function *PrototypeAST::codegen(const std::string scope) {

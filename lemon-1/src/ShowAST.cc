@@ -100,3 +100,19 @@ void IfStmtAST::showAST() {
     }
     printf("End If\n");
 }
+
+void ForStmtAST::showAST() {
+    printf("For loop: \n");
+    printf("Iterator: (%s)\n", iterator.c_str());
+    printf("Start: \n");
+    start->showAST();
+    printf("End: \n");
+    end->showAST();
+    printf("Step: \n");
+    step->showAST();
+    printf("{\n");
+    for (auto &stmt : forBody) {
+        stmt->showAST();
+    }
+    printf("{\n");
+}

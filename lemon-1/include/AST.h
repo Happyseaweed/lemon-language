@@ -16,6 +16,8 @@
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/DeadStoreElimination.h"
+#include "llvm/Transforms/Scalar/DCE.h"
 #include <llvm/Support/TargetSelect.h>
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
@@ -210,6 +212,23 @@ public:
               std::vector<std::unique_ptr<StmtAST>> elseBody)
         : cond(std::move(cond)), thenBody(std::move(thenBody)), 
           elseBody(std::move(elseBody)) {}
+    
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
+class ForStmtAST : public StmtAST {
+    std::string iterator;
+    std::unique_ptr<ExprAST> start, end, step;
+    std::vector<std::unique_ptr<StmtAST>> forBody;
+public:
+    ForStmtAST(const std::string &iterator, 
+               std::unique_ptr<ExprAST> start,
+               std::unique_ptr<ExprAST> end,
+               std::unique_ptr<ExprAST> step,
+               std::vector<std::unique_ptr<StmtAST>> forBody)
+        : iterator(iterator), start(std::move(start)), end(std::move(end)),
+          step(std::move(step)), forBody(std::move(forBody)) {}
     
     Value *codegen(const std::string scope) override;
     void showAST() override;

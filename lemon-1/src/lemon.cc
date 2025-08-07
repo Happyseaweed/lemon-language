@@ -60,10 +60,6 @@ void InitializeModule() {
     TheSI->registerCallbacks(*ThePIC, TheMAM.get());
 
     // Add transform passes.
-    // Do simple "peephole" optimizations and bit-twiddling optimizations.
-    TheFPM->addPass(InstCombinePass());
-    // Reassociate expressions.
-    TheFPM->addPass(ReassociatePass());
     // Eliminate Common SubExpressions.
     TheFPM->addPass(GVNPass());
     // Simplify the control flow graph (deleting unreachable blocks, etc).
@@ -76,6 +72,7 @@ void InitializeModule() {
 
     // ADCE passes
     TheFPM->addPass(ADCEPass());
+    TheFPM->addPass(DSEPass());
 
     // Register analysis passes used in these transform passes.
     PassBuilder PB;
@@ -146,7 +143,7 @@ void runLemon() {
             
             // Optimizations:
             TheFPM->run(*F, *TheFAM);
-            
+
             // Saving LLVM IR to a file.
             std::error_code EC;
             raw_fd_ostream out("./output.ll", EC, sys::fs::OF_None);
@@ -159,7 +156,7 @@ void runLemon() {
             TheModule->print(out, nullptr);
           
             // JIT Execution (using this as "AOT" compiler for now...)
-            fprintf(stderr, "🍋 Lemon Executing...\n");
+            // fprintf(stderr, "🍋 Lemon Executing...\n");
             
             // Getting global variable constructors.
             GlobalVariable *GlobalCtors = TheModule->getGlobalVariable("llvm.global_ctors");
@@ -178,7 +175,8 @@ void runLemon() {
             // Executing main()
             auto ExprSymbol = ExitOnErr(TheJIT->lookup("lemon_main"));
             double (*FP)() = ExprSymbol.toPtr<double (*)()>();
-            fprintf(stderr, "Evaluated to %f\n\n\n", FP());
+            FP();
+            // fprintf(stderr, "Evaluated to %f\n\n\n", FP());
             
             // Dumping JITDylib symbol table.
             // TheJIT->getMainJITDylib().dump(errs());

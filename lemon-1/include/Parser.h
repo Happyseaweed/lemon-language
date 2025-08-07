@@ -43,6 +43,8 @@ std::unique_ptr<StmtAST> ParseExtern();
 
 std::unique_ptr<StmtAST> ParseIfStmt();
 
+std::unique_ptr<StmtAST> ParseForStmt();
+
 std::vector<std::unique_ptr<ExprAST>> ParseArgList();
 
 std::unique_ptr<StmtAST> ParseVariableDecl();

@@ -1,0 +1,13 @@
+extern printd(x);
+
+func benchmark(n) {
+    var ind = 1;
+    var x = 0;
+    for (i = 1, n) {
+        x = 2 * ind + 1;
+        ind = ind + 1;
+    }
+    return x;
+}
+
+printd(benchmark(1000000));
