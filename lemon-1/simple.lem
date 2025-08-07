@@ -1,0 +1,19 @@
+extern printd(x);
+
+
+printd(1);
+
+func add(x, y) {
+    var sum = x + y;
+    return sum;
+}
+
+printd(add(1,1));
+var dum = 13;
+
+var test = (1*2*dum)+(2*dum*1);
+
+printd(test);
+printd(test);
+
+test = (1*2*dum)+(2*dum*1) + 3;

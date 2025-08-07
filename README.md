@@ -6,11 +6,11 @@ WIP
 Lemon is a simple programming language built around tensor ops and leverages LLVM to optimize and compile.
 
 The goal is: 
-0) Systematic exploration of LLVM, IR generation and optimization passes.
-1) Create a simple language that is capable of implementing simple ML concepts.
+1) Systematic exploration of LLVM, IR generation and optimization passes.
+2) Create a simple language that is capable of implementing simple ML concepts.
 
 Features:
-- Types: float, bool, tensor
+- Types: float, tensor
 - Conditionals: if/else, for
 - Functions
 

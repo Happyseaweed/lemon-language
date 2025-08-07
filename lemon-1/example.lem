@@ -1,0 +1,48 @@
+
+extern printd(x);
+
+var p = 666;
+var a = 10;
+var b = 20;
+
+
+func test() {
+    var testONE = 1;
+    testONE = 99.99;
+    testONE = p;
+    testONE = p;
+    testONE = (1+2)*((a+b)*3 - (2+4)/3);
+#    testONE = printd(10);
+}
+
+func another(c) {
+    var testTWO = 2;
+    testTWO = c;
+    p = 10;
+}
+
+func explode() {
+    var testTHREE = 3;
+#    printd(696969);
+}
+
+
+var bigChungus = 0;
+bigChungus = test() + another(9) + explode();
+
+var sumTest = 0;
+sumTest = 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10;
+
+var globalTest = 1;
+
+func ifTest() {
+
+    if (globalTest) {
+        printd(globalTest);
+    } else {
+        printd(9);
+    }
+    
+}
+
+ifTest();

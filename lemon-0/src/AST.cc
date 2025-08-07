@@ -35,7 +35,7 @@ Value *VariableExprAST::codegen() {
 }
 
 Function *PrototypeAST::codegen() {
-    fprintf(stderr, "Prototype Codegen\n");
+    // fprintf(stderr, "Prototype Codegen\n");
     std::vector<Type*> Doubles(Args.size(),
                                 Type::getDoubleTy(*TheContext));
     FunctionType *FT =
@@ -52,7 +52,7 @@ Function *PrototypeAST::codegen() {
 }
 
 Value *BinaryExprAST::codegen() {
-    fprintf(stderr, "Binary Expr Codegen\n");
+    // fprintf(stderr, "Binary Expr Codegen\n");
 
     // Special case for assignment operator
     if (Op == '=') {
@@ -103,7 +103,7 @@ Value *BinaryExprAST::codegen() {
 }
 
 Value *CallExprAST::codegen() {
-    fprintf(stderr, "Call Expr Codegen\n");
+    // fprintf(stderr, "Call Expr Codegen\n");
 
     // Look up the name in the global module table.
     Function *CalleeF = getFunction(Callee);
@@ -127,7 +127,7 @@ Value *CallExprAST::codegen() {
 }
 
 Function *FunctionAST::codegen() {
-    fprintf(stderr, "Function Codegen\n"); 
+    // fprintf(stderr, "Function Codegen\n"); 
     
     // First, check for an existing function from a previous 'extern' declaration.
     auto &P = *Proto;
@@ -155,9 +155,23 @@ Function *FunctionAST::codegen() {
         NamedValues[std::string(Arg.getName())] = Alloca;
     }
     
-    if (Value *RetVal = Body->codegen()) {
+    if (ExprBody) {
+        if (Value *RetVal = ExprBody->codegen()) {
+            // Finish off the function.
+            Builder->CreateRet(RetVal);
+
+            // Validate the generated code, checking for consistency.
+            verifyFunction(*TheFunction);
+
+            // Optimization, wow this is literally magic!!!
+            TheFPM->run(*TheFunction, *TheFAM);
+
+            return TheFunction;
+        }
+    } else if (StmtBody) {
+        StmtBody->codegen();
         // Finish off the function.
-        Builder->CreateRet(RetVal);
+        Builder->CreateRet(nullptr);
 
         // Validate the generated code, checking for consistency.
         verifyFunction(*TheFunction);
@@ -344,6 +358,33 @@ Value *VarExprAST::codegen() {
 
     return BodyVal;
 }
+
+// Statements don't evaluate to anything, so doesn't return Value *???
+void VarDeclStmtAST::codegen() {
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+    Value *InitVal = Init->codegen(); // Generate the RHS and evaluate value.
+
+    if (!InitVal)
+        return;
+    
+    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, Name);
+    Builder->CreateStore(InitVal, Alloca);
+
+    NamedValues[Name] = Alloca;
+}
+
+void AssignmentStmtAST::codegen() {
+    Value *ExprVal = Expr->codegen();
+    Value *Variable = NamedValues[Name];
+    if (!ExprVal) 
+        return;
+
+    if (!Variable)
+        return;
+    
+    Builder->CreateStore(ExprVal, Variable);
+}
+
 
 // Helper function
 Function *getFunction(std::string Name) {

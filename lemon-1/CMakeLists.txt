@@ -1,4 +1,4 @@
-# CMAKE Lists - Jul 30 2025
+# CMAKE Lists - July 2025
 # Siwei Du
 
 cmake_minimum_required(VERSION 3.15)
@@ -24,9 +24,11 @@ add_definitions(${LLVM_DEFINITIONS})
 # List of source files
 set(SOURCES
     src/lemon.cc
-    src/parser.cc
-    src/lexer.cc
-    src/ast.cc
+    src/Parser.cc
+    src/Lexer.cc
+    src/Ast.cc
+    src/Codegen.cc
+    src/ShowAST.cc
 )
 
 add_executable(lemon ${SOURCES})
@@ -36,30 +38,10 @@ add_executable(lemon ${SOURCES})
 # are on another architecture.
 
 llvm_map_components_to_libnames(LLVM_LIBS
-  core
-  native
-  nativecodegen
   orcjit
   executionengine
   jitlink
-  passes
-  transformutils
-  analysis
-  asmparser
-  asmprinter
-  target
-  irreader
-  support
-  mc
-  mcjit
-  mcparser
-  AArch64
-  AArch64AsmParser
-  AArch64CodeGen
-  AArch64Desc
-  AArch64Disassembler
-  AArch64Info
-  AArch64Utils
+  native
 )
 
 target_link_libraries(lemon ${LLVM_LIBS})

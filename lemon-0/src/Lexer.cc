@@ -9,6 +9,7 @@ int gettok() {
 	// Skipping whitespaces
 	while (isspace(LastChar)) LastChar = getchar();
 
+	// Supports only alpha-started IDs
 	if (isalpha(LastChar)) {
 		IdentifierStr = LastChar;
 
@@ -36,10 +37,15 @@ int gettok() {
             return tok_unary;
         if (IdentifierStr == "var")
             return tok_var;
+		if (IdentifierStr == "while")
+			return tok_while;
+		if (IdentifierStr == "return")
+			return tok_return;
 
 		return tok_identifier;
 	}
 
+	// Numbers (decimals included)
 	if (isdigit(LastChar) || LastChar == '.') {
 		std::string NumStr;
 
@@ -52,6 +58,7 @@ int gettok() {
 		return tok_number;
 	}
 
+	// Comments
 	if (LastChar == '#') {
 		do 
 			LastChar = getchar();
@@ -61,6 +68,28 @@ int gettok() {
             return gettok();
 	}
 
+	// {, }, ;
+	if (LastChar == '}') {
+		LastChar = getchar();
+		return tok_rbrace;
+	}
+
+	if (LastChar == '{') {
+		LastChar = getchar();
+		return tok_lbrace;
+	}
+	
+	if (LastChar == ';') {
+		LastChar = getchar();
+		return tok_semi;
+	}
+
+	// if (LastChar == '=') {
+	// 	LastChar = getchar();
+	// 	return tok_equal;
+	// }
+
+	// EOF and other undefined symbols.
 	if (LastChar == EOF) 
 		return tok_eof;
 
