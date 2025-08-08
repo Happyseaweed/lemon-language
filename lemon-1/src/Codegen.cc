@@ -13,8 +13,11 @@ std::unique_ptr<IRBuilder<>> FunctionBuilder;
 
 std::unique_ptr<Module> TheModule;
 std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // Scope'd vars
+std::map<std::string, AllocaInst*> LoopIterators;                       // Iterate with-in loop scope.
 std::map<std::string, GlobalVariable*> GlobalVariables;                 // Global vars.
 std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;    // Function signatures
+
+int LoopScopeCounter;
 
 // Optimization Vars
 std::unique_ptr<FunctionPassManager> TheFPM;
@@ -366,7 +369,7 @@ Value *ForStmtAST::codegen(const std::string scope) {
     // afterloop:
     //
 
-    // Create iterator variable.
+    // Create iterator start value;
     Value *startV = start->codegen(scope);
     if (!startV)
         return nullptr;
@@ -389,7 +392,6 @@ Value *ForStmtAST::codegen(const std::string scope) {
     
         // Calculate step value
     Value *stepVal = step->codegen(scope);
-
 
     // Evaluate expression to a value
     Value *endVal = end->codegen(scope);
@@ -534,4 +536,8 @@ AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                      TheFunction->getEntryBlock().begin());
     return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, varName);
+}
+
+std::string generateLoopScope() {
+    return "_Loop_" + std::to_string(LoopScopeCounter++);
 }
