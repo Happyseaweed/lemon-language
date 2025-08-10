@@ -28,6 +28,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <stack>
 
 using namespace llvm;
 using namespace llvm::orc;
@@ -244,7 +245,11 @@ extern std::unique_ptr<IRBuilder<>> FunctionBuilder;
 
 extern std::unique_ptr<Module> TheModule;
 extern std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable; // Stores all variables
+extern std::stack<std::string> ScopeStack;
 extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
+
+extern int LoopScopeCounter;
+extern std::string generateLoopScope();
 
 extern AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef varName);
 extern Function *getFunction(std::string name, std::string scope = "_global");

@@ -106,6 +106,15 @@ and their inits are stored.
 
 
 ---
+# Refactoring codegen() and better builder handling.
+1. Extern statements for imports are added globally.
+2. Func statements have their own scopes, built with regular Builder.
+3. Anything else is put in lemon_main() and are executed sequentially.
+4. Generation occurs as the file is being read, meaning declaration before
+   use is enforced for both variables and functions.
+
+
+---
 # How IRBuilder<> Works
 Builder acts as an iterator for where to insert new LLVM IR.
 

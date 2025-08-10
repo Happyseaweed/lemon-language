@@ -142,7 +142,7 @@ void runLemon() {
             result->codegen();
             
             // Optimizations:
-            TheFPM->run(*F, *TheFAM);
+            // TheFPM->run(*F, *TheFAM);
 
             // Saving LLVM IR to a file.
             std::error_code EC;
