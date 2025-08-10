@@ -1,11 +1,9 @@
 extern printd(x);
 
 func benchmark(n) {
-    var ind = 1;
-    var x = 10;
-    for (i = 1, n+1) {
+    var x = 1;
+    for (i = 2, n+1) {
         x = x + i;
-        ind = ind + 1;
     }
     return x;
 }

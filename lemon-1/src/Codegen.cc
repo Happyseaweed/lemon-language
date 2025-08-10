@@ -12,9 +12,9 @@ std::unique_ptr<IRBuilder<>> MainBuilder;
 std::unique_ptr<IRBuilder<>> FunctionBuilder;
 
 std::unique_ptr<Module> TheModule;
-std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // Scope'd vars
-std::map<std::string, AllocaInst*> LoopIterators;                       // Iterate with-in loop scope.
-std::map<std::string, GlobalVariable*> GlobalVariables;                 // Global vars.
+std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // SymbolTable for each scope.
+std::stack<std::string> ScopeStack;
+std::map<std::string, GlobalVariable*> GlobalVariables;                 // Global variables
 std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;    // Function signatures
 
 int LoopScopeCounter;
@@ -382,6 +382,7 @@ Value *ForStmtAST::codegen(const std::string scope) {
     
     AllocaInst *Alloca = CreateEntryBlockAlloca(F, iterator);
     Builder->CreateStore(startV, Alloca);
+    SymbolTable[scope][iterator] = Alloca;
 
     // Basic blocks
     BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", F);
