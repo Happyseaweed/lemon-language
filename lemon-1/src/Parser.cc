@@ -94,9 +94,8 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseForStmt();
         
         default:
-            return nullptr;
-            // fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
-            // return LogErrorS("Unknown token when parsing statement.");
+            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
+            return LogErrorS("Unknown token when parsing statement.");
     }
 }
 
@@ -147,8 +146,8 @@ std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
     if (peakedToken == tok_assign) {
         return ParseVariableAssign();
     }
-    else if (peakedToken == tok_lparen) {
-        auto expr = ParseIdentifierExpr(); // should return a function call.
+    else if (peakedToken == tok_lparen || peakedToken == tok_rbracket) {
+        auto expr = ParseIdentifierExpr(); // should return a function call OR subscript
         
         if (curTok != tok_semi)
             return LogErrorS("Expected ';' after expression statement.");
@@ -156,6 +155,7 @@ std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
 
         return std::make_unique<ExpressionStmtAST>(std::move(expr));
     }
+    
     return nullptr; 
 }
 
@@ -185,7 +185,7 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
 // ============================================================================
 
 std::unique_ptr<FunctionAST> ParseFunction() {
-    // func ID ( arg_list ) { STATEMENT LIST }
+    // func ID ( arg_list ) { STATEMENT LIST 
     getNextToken(); // Consumes 'func' keyword
     
     auto proto = ParsePrototype();
@@ -447,27 +447,53 @@ std::unique_ptr<ExprAST> ParseNumberExpr() {
 }
 
 std::unique_ptr<ExprAST> ParseIdentifierExpr() {
-    std::string identifier = idStr;
+    std::string identifier = idStr;                     // Id name
+    std::vector<std::unique_ptr<ExprAST>> subscripts;   // For tensor subscript expr
+    std::vector<std::unique_ptr<ExprAST>> argList;      // For function call expr
     getNextToken(); // Consume ID;
 
     // If just an ID
-    if (curTok != tok_lparen) {
+    if (curTok != tok_lparen && curTok != tok_lbracket) {
         return std::make_unique<VariableExprAST>(identifier);
     }
 
+    // If subscripts
+    if (curTok == tok_lbracket) {
+        getNextToken(); // Consume '['
+
+        while(true) {
+            auto E = ParseExpression();
+            if (!E) {
+                return LogError("Expected expression in subscript operator.");
+            }
+
+            subscripts.push_back(std::move(E));
+            if (curTok != tok_rbracket) {
+                return LogError("Expected ']' after subscript.");
+            }
+            getNextToken(); //Consumes ']'
+            
+            if (curTok != tok_lbracket) {
+                break;
+            }
+            getNextToken(); // Consumes next subscript's '[' char.
+        }
+
+        return std::make_unique<SubscriptExprAST>(identifier, std::move(subscripts));
+    }
+
     // If function call
-    // printf("Parsing function call: %s\n", identifier.c_str());
-    std::vector<std::unique_ptr<ExprAST>> argList;
     getNextToken(); // consume '('
 
     // Arg list
     if (curTok != tok_rparen) {
         while(true) {
-            if (auto arg = ParseExpression()) {
-                argList.push_back(std::move(arg));
-            } else {
+            auto arg = ParseExpression();
+            if (!arg) {
                 return nullptr;
             }
+
+            argList.push_back(std::move(arg));
 
             if (curTok == tok_rparen)
                 break;
@@ -485,15 +511,13 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     return std::make_unique<CallExprAST>(identifier, std::move(argList));
 }
 
-bool ValidTensorShape(const std::unique_ptr<TensorExprAST> &tensor) {    
-    
-}
-
 std::unique_ptr<ExprAST> ParseTensorExpr() {
     // [...]
     std::vector<int> shape;
     std::vector<std::unique_ptr<ExprAST>> values;
     size_t curDimensionCount = 0;
+    std::vector<int> subShape;
+    int subTensorCount = 0;
 
     getNextToken(); // Consume '['
 
@@ -505,6 +529,16 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
             if (!E) {
                 return nullptr;
             }
+            
+            subTensorCount += 1;
+            TensorExprAST* TE = dynamic_cast<TensorExprAST*>(E.get());
+
+            if (subShape.size() > 0 && subShape != TE->getShape()) {
+                return LogError("Tensor shape incorrect, different shaped sub-tensors.");               
+            } else {
+                subShape = TE->getShape();
+            }
+            
             values.push_back(std::move(E));
         }
         else if (curTok == tok_num) {
@@ -512,6 +546,10 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
             printf("Num in Tensor\n");
             if (!E) {
                 return nullptr;
+            }
+
+            if (subTensorCount > 0) {
+                return LogError("Tensor shape incorrect, cannot contain mix of tensors and nums.");
             }
 
             values.push_back(std::move(E));
@@ -522,12 +560,17 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
             if (!E) {
                 return nullptr;
             }
+            
+            if (subTensorCount > 0) {
+                return LogError("Tensor shape incorrect, cannot contain mix of tensors and IDs.");
+            }
 
             values.push_back(std::move(E));
         }
         else {
             return LogError("Expected expression in tensor decl list.");
         }
+        curDimensionCount++;
 
         if (curTok == tok_rbracket) {
             break;
@@ -538,7 +581,6 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
             return LogError("Expected ',' in tensor decl list.");
         }
         getNextToken(); // Consume ','
-        curDimensionCount++;
     }
 
     if (curTok != tok_rbracket) {
@@ -546,13 +588,21 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
     }
     getNextToken(); // consume ']'
     
-    std::unique_ptr<TensorExprAST> tensor = 
-        std::make_unique<TensorExprAST>(std::vector<int>(), std::move(values));
-    
-    // Check if shape of tensor is valid.
-    if (!ValidTensorShape(tensor)) {
-        return LogError("Tensor shape is invalid!");
+    // Checking for bad shapes
+    if (subTensorCount > 0 && subTensorCount != curDimensionCount) {
+        return LogError("Tensor shape incorrect, cannot contain mix of tensors and NUM/IDs.");
+    }   
+
+    // Update shape for current tensor
+    shape.push_back(curDimensionCount);
+    if (subShape.size() != 0) {
+        for (auto &item : subShape) {
+            shape.push_back(item);
+        }
     }
+
+    std::unique_ptr<TensorExprAST> tensor = 
+        std::make_unique<TensorExprAST>(std::move(shape), std::move(values));
 
     return std::move(tensor);
 }

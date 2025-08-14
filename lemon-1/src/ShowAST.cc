@@ -41,6 +41,16 @@ void TensorExprAST::showAST() {
     printf("]\n");
 }
 
+void SubscriptExprAST::showAST() {
+    printf("(subscpt)%s", varName.c_str());
+    for (auto &item : subscripts) {
+        printf("[");
+        item->showAST();
+        printf("]");
+    }
+    printf(";\n");
+}
+
 void CallExprAST::showAST() {
     printf("CallExpr: %s(", callee.c_str());
     for (auto &item : args) {

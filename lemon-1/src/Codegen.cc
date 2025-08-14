@@ -121,6 +121,13 @@ Value *VariableExprAST::codegen(const std::string scope) {
 
 Value *TensorExprAST::codegen(const std::string scope) {
     fprintf(stderr, "Tensor Expr AST Codegen()\n");
+
+    return nullptr;
+}
+
+Value *SubscriptExprAST::codegen(const std::string scope) {
+    // Generates code and evaluates subscripts to integer values.
+    // Check bounds against stored tensor at compile time
     
     return nullptr;
 }

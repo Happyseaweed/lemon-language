@@ -123,6 +123,18 @@ public:
     const std::vector<std::unique_ptr<ExprAST>> &getValues() { return values; }
 };
 
+class SubscriptExprAST : public ExprAST {
+    std::string varName;
+    std::vector<std::unique_ptr<ExprAST>> subscripts;
+public:
+    SubscriptExprAST(std::string varName, 
+                     std::vector<std::unique_ptr<ExprAST>> subscripts)
+        : varName(varName), subscripts(std::move(subscripts)) {}
+    
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
 class CallExprAST : public ExprAST {
     std::string callee; 
     std::vector<std::unique_ptr<ExprAST>> args;

@@ -1,16 +1,3 @@
 
-
-var numTest = 10.0;
-var idTest = numTest;
-var tenTest = [1, 2, 3];
-
-var tenTestNested = [ [1, 2, 3], [1, 2, 3], [1, 2, 3]];
-
-var tenTestID = [idTest, idTest, idTest];
-var tenTestIDNested = [ [idTest, idTest, idTest], [idTest, idTest, idTest], [idTest, idTest, idTest]];
-
-var tenTestMix = [1, 2, 3, 4, 5, idTest, idTest, idTest, idTest, idTest];
-
-var tenTestMixNested = [ [1, idTest, 1], [2, 2, idTest], [idTest, idTest, 3]];
-
-var tenTestNestedID = [tenTestMix, tenTestMix];
+var test = [1, 2, 3];
+var a = test[1][2][3];
