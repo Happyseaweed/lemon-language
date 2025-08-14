@@ -119,6 +119,12 @@ Value *VariableExprAST::codegen(const std::string scope) {
     return LogErrorV(errorStr.c_str());
 }
 
+Value *TensorExprAST::codegen(const std::string scope) {
+    fprintf(stderr, "Tensor Expr AST Codegen()\n");
+    
+    return nullptr;
+}
+
 Value *CallExprAST::codegen(const std::string scope) {
     Function *calleeF = getFunction(callee, scope);
 

@@ -138,9 +138,10 @@ void runLemon() {
             BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", F);
             MainBuilder->SetInsertPoint(BB);
             
-            // result->showAST(); // Print AST for debugging.
-            result->codegen();
+            result->showAST(); // Print AST for debugging.
             
+            result->codegen();
+
             // Optimizations:
             // TheFPM->run(*F, *TheFAM);
 

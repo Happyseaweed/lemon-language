@@ -74,12 +74,32 @@ for (i = 0, i < n, 1.0) {
 }
 ```
 
-### while loops:
+### while loops (unsupported):
 ```
 while (expr) {
     stmtList;
 }
 ```
+
+### Tensor type decl:
+- Tensors are of double type by default.
+```
+var x = [[1,1,1], [2,2,2], [3,3,3]];
+```
+
+- QoL functions:
+```
+var x = ones(shape);    // [shape] is a list of integers
+var x = zeroes(shape);   
+var x = rand(shape);    // Generated at runtime with LLVM RNG
+```
+
+- Indexing and using tensors:
+```
+x[i][j] = 1.23;
+x[i][j][k] = 1.23;      // Shape and bounds are checked at compile time.
+```
+
 
 ---
 # Compilation Details:

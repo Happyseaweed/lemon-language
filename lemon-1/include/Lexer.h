@@ -42,7 +42,10 @@ enum Token {
     tok_eq = -25,
     tok_neq = -26,
 
-    tok_for = -27
+    tok_for = -27,
+
+    tok_lbracket = -28,
+    tok_rbracket = -29
 };
 
 extern std::string idStr;

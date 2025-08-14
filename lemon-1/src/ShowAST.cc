@@ -27,6 +27,20 @@ void VariableExprAST::showAST() {
     printf("Var(%s)", varName.c_str());
 }
 
+void TensorExprAST::showAST() {
+    printf("(");
+    for (auto &item : shape) {
+        printf("%d, ", item);
+    }
+    printf(")[");
+    
+    for (auto &item : values) {
+        item->showAST();
+        printf(",");
+    }
+    printf("]\n");
+}
+
 void CallExprAST::showAST() {
     printf("CallExpr: %s(", callee.c_str());
     for (auto &item : args) {

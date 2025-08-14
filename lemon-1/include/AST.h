@@ -107,6 +107,22 @@ public:
     const std::string getVarName() const { return varName; }
 };
 
+class TensorExprAST : public ExprAST {
+    std::vector<int> shape;
+    std::vector<std::unique_ptr<ExprAST>> values;
+
+public:
+    TensorExprAST(std::vector<int> shape, std::vector<std::unique_ptr<ExprAST>> values)
+        : shape(std::move(shape)), values(std::move(values)) {}
+
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+
+    const std::vector<int> getShape() const { return shape; }
+    const size_t getSize() const { return values.size(); }
+    const std::vector<std::unique_ptr<ExprAST>> &getValues() { return values; }
+};
+
 class CallExprAST : public ExprAST {
     std::string callee; 
     std::vector<std::unique_ptr<ExprAST>> args;

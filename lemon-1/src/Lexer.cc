@@ -76,6 +76,14 @@ int gettok() {
         curChar = getchar();
         return tok_rparen;
     }
+    if (curChar == '[') {
+        curChar = getchar();
+        return tok_lbracket;
+    }
+    if (curChar == ']') {
+        curChar = getchar();
+        return tok_rbracket;
+    }
     
     // Binary OPs
     if (curChar == '+') {
@@ -195,6 +203,10 @@ std::string tokenToString(int token) {
         return "{";
     case tok_rbrace:
         return "}";
+    case tok_lbracket:
+        return "[";
+    case tok_rbracket:
+        return "]";
     case tok_comma:
         return ",";
     case tok_assign:
