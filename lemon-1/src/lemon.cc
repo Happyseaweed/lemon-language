@@ -140,6 +140,7 @@ void runLemon() {
             
             result->showAST(); // Print AST for debugging.
             
+            printf("\nLemon Execution: \n");
             result->codegen();
 
             // Optimizations:

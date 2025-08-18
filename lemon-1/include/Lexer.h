@@ -25,7 +25,7 @@ enum Token {
     tok_mul = -13,
     tok_div = -14,
 
-    tok_var = -15,
+    // tok_var = -15,
 
     tok_id = -16,
     tok_num = -17,
@@ -45,7 +45,10 @@ enum Token {
     tok_for = -27,
 
     tok_lbracket = -28,
-    tok_rbracket = -29
+    tok_rbracket = -29,
+
+    tok_double = -30,
+    tok_tensor = -31
 };
 
 extern std::string idStr;

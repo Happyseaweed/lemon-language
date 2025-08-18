@@ -80,7 +80,9 @@ std::unique_ptr<StmtAST> ParseStatement() {
     switch (curTok) {
         case tok_return:
             return ParseReturn();
-        case tok_var:
+        // case tok_var:
+        case tok_double:
+        case tok_tensor:
             return ParseVariableDecl();
         case tok_id:
             return ParseVariableAssignOrFunctionCall();
@@ -120,7 +122,9 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
     // Does not allow chaining (yet): var ID1, ID1, ID3, = EXPR1, EXPR2, EXPR3;
 
     std::string varName;
-    getNextToken(); // Consume 'var' kw
+    bool isDouble = curTok == tok_double ? true : false;
+
+    getNextToken(); // Consume variable type keyword
 
     varName = idStr;
     getNextToken(); // Consume ID
@@ -137,6 +141,11 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
         return LogErrorS("Expected ';' after statement.");
     getNextToken();
     
+    if (isDouble)
+        E->type.kind = LemonType::TypeKind::Double;
+    else 
+        E->type.kind = LemonType::TypeKind::Tensor;
+
     return std::make_unique<VariableDeclStmt>(varName, std::move(E));
 }
 
@@ -443,6 +452,8 @@ std::unique_ptr<ExprAST> ParseNumberExpr() {
     auto result = std::make_unique<NumberExprAST>(numVal);
     getNextToken(); // Consume num token
 
+    result->type.kind = LemonType::TypeKind::Double;
+
     return std::move(result);
 }
 
@@ -513,10 +524,10 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
 
 std::unique_ptr<ExprAST> ParseTensorExpr() {
     // [...]
-    std::vector<int> shape;
+    std::vector<size_t> shape;
     std::vector<std::unique_ptr<ExprAST>> values;
     size_t curDimensionCount = 0;
-    std::vector<int> subShape;
+    std::vector<size_t> subShape;
     int subTensorCount = 0;
 
     getNextToken(); // Consume '['
@@ -600,10 +611,12 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
             shape.push_back(item);
         }
     }
-
+    
     std::unique_ptr<TensorExprAST> tensor = 
-        std::make_unique<TensorExprAST>(std::move(shape), std::move(values));
+        std::make_unique<TensorExprAST>(shape, std::move(values));
 
+    tensor->type.kind = LemonType::TypeKind::Tensor;
+    tensor->type.shape = shape;
+    
     return std::move(tensor);
 }
-

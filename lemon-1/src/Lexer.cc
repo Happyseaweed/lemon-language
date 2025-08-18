@@ -19,8 +19,12 @@ int gettok() {
         // Check for keywords
         if (idStr == "func")    
             return tok_func;
-        if (idStr == "var")
-            return tok_var;
+        // if (idStr == "var")
+        //     return tok_var;
+        if (idStr == "double")
+            return tok_double;
+        if (idStr == "tensor")  
+            return tok_tensor;
         if (idStr == "extern")
             return tok_extern;
         if (idStr == "return")
@@ -223,8 +227,12 @@ std::string tokenToString(int token) {
         return "*";
     case tok_div:
         return "/";
-    case tok_var:
-        return "var";
+    // case tok_var:
+    //     return "var";
+    case tok_double:
+        return "double";
+    case tok_tensor:
+        return "tensor";
     case tok_id:
         return idStr;
     case tok_num:

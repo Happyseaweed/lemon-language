@@ -1,0 +1,26 @@
+extern printd(x);
+
+
+printd(1);
+
+var two = 2;
+printd(two);
+
+
+func three() {
+    var t = 3;
+    printd(t);
+}
+
+three();
+
+func four(x, y, z) {
+    printd(x + y + z);
+}
+
+four(1, 1, 2);
+
+two = 3;
+
+var five = 2*two - 1;
+printd(five);

@@ -1,6 +1,7 @@
 #include "../include/Lexer.h"
 #include "../include/Parser.h"
 #include "../include/AST.h"
+#include "../include/SymbolTable.h"
 
 using namespace llvm;
 
@@ -12,8 +13,9 @@ std::unique_ptr<IRBuilder<>> MainBuilder;
 std::unique_ptr<IRBuilder<>> FunctionBuilder;
 
 std::unique_ptr<Module> TheModule;
-std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // SymbolTable for each scope.
-std::stack<std::string> ScopeStack;
+// std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // SymbolTable for each scope.
+// std::stack<std::string> ScopeStack;
+std::vector<std::pair<std::string, std::unordered_map<std::string, Symbol>>> SymbolTable;
 std::map<std::string, GlobalVariable*> GlobalVariables;                 // Global variables
 std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;    // Function signatures
 
@@ -98,14 +100,18 @@ Value *BinaryExprAST::codegen(const std::string scope) {
 }
 
 Value *NumberExprAST::codegen(const std::string scope) {
+    printf("NumberExprAST::codegen()\n");
     return ConstantFP::get(*TheContext, APFloat(val));
 }
 
 Value *VariableExprAST::codegen(const std::string scope) {
-    AllocaInst* A = SymbolTable[scope][varName];
+    Symbol* S = findSymbol(scope, varName);
+
     GlobalVariable* GV = GlobalVariables[varName];
 
-    if (A) {
+    if (S) {
+        AllocaInst* A = S->alloca;
+        LemonType::Type VT = S->type;
         if (scope == "_global")
             return MainBuilder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
         return Builder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
@@ -119,10 +125,51 @@ Value *VariableExprAST::codegen(const std::string scope) {
     return LogErrorV(errorStr.c_str());
 }
 
-Value *TensorExprAST::codegen(const std::string scope) {
-    fprintf(stderr, "Tensor Expr AST Codegen()\n");
+ArrayType* makeNestedTensorType(const std::vector<size_t>& shape) {
+    // Helper function that produces a ArrayType* for nested tensors.
+    // should produce something like: [A x [B x [C x ... [Z x double]]]]
+    int n = shape.size();
+    Type* leaf = Type::getDoubleTy(*TheContext);
+    ArrayType* ret = ArrayType::get(leaf, shape[n-1]); 
 
-    return nullptr;
+    for (int i = n-2; i >= 0; --i) {
+        ret = ArrayType::get(ret, shape[i]);
+    }
+
+    return ret;
+}
+
+Value *TensorExprAST::codegen(const std::string scope) {
+    fprintf(stderr, "Tensor Expr AST Codegen() in scope: [%s]\n", scope.c_str());
+    // generates a tensor on the stack.
+
+    size_t numElements = 1;
+    for (int i = 0; i < shape.size(); ++i) {
+        numElements *= shape[i];
+    }
+
+    ArrayType* ArrayType; 
+    Type* ElemType; 
+
+    if (values[0]->type.isScalar()) {
+        ElemType = Type::getDoubleTy(*TheContext);
+        ArrayType = ArrayType::get(ElemType, shape[0]);
+    }
+    else {
+        dbug();
+        ArrayType = makeNestedTensorType(shape);
+        // ArrayType* ArrayTy = ArrayType::get(ElemType, shape[0]);
+    }
+
+    Value *AggregateValue = UndefValue::get(ArrayType);
+    
+    // Store each value, should only be used for small tensors!
+    for (unsigned i = 0; i < shape[0]; ++i) {
+        Value *elem = values[i]->codegen(scope);
+        AggregateValue = Builder->CreateInsertValue(AggregateValue, elem, {i}, "ins");
+    }
+    printf("TensorExprAST completed.\n"); 
+    return AggregateValue;
 }
 
 Value *SubscriptExprAST::codegen(const std::string scope) {
@@ -166,19 +213,42 @@ Value *VariableDeclStmt::codegen(const std::string scope) {
 
     Value *initVal;
 
+    printf("Checking to generate defBody\n");
+
     if (defBody) {
+        printf("defBody is good, generating defBody\n");
         initVal = defBody->codegen(scope);
         if (!initVal)
             return nullptr;
     } else {
         // If not specified, default to 0.0.
         initVal = ConstantFP::get(*TheContext, APFloat(0.0)); 
+        printf("defBody not specified, defaulting to 0!\n");
     }
 
-    AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, varName);
-    Builder->CreateStore(initVal, Alloca);
+    AllocaInst *Alloca = nullptr;
 
-    SymbolTable[scope][varName] = Alloca;
+    printf("going into if check in decl gen\n");
+
+    if (defBody->type.isScalar()) {
+        printf("defBody is scalar\n");
+        Alloca = CreateEntryBlockAlloca(TheFunction, varName);
+        Builder->CreateStore(initVal, Alloca);
+    } else {
+        std::vector<size_t> shape = defBody->type.getTypeShape();
+        size_t numElements = 1;
+        for (int i = 0; i < shape.size(); ++i) {
+            numElements *= shape[i];
+        }
+        
+        Alloca = CreateEntryBlockAllocaTensor(TheFunction, varName, numElements);
+        dbug();
+        Builder->CreateStore(initVal, Alloca);
+        dbug();
+        printf("==============================Tensor CreateStore successful()\n");
+    }
+
+    addSymbol(varName, Alloca);
 
     return Alloca;
 }
@@ -237,12 +307,7 @@ Value *VariableDeclStmt::codegen_global() {
         swap(TmpBuilder, Builder); // Swap back the old builder.
         
         // Optimizations
-        TheFPM->run(*F, *TheFAM);
-
-        // llvm::appendToGlobalCtors 
-        // Referenced from: https://llvm.org/doxygen/ModuleUtils_8h.html
-        // DEACTIVATED, currently init'ing global vars via function calls in lemon_main
-        // appendToGlobalCtors(*TheModule, F, nextGlobalPriority++);
+        // TheFPM->run(*F, *TheFAM);
 
         // Add it to table
         GlobalVariables[varName] = GV;
@@ -258,13 +323,17 @@ Value *VariableDeclStmt::codegen_global() {
 
 Value *AssignmentStmt::codegen(const std::string scope) {
     Value *newVal = defBody->codegen(scope);
+    Value *variable = nullptr;
     
     if (!newVal)
         return nullptr;
 
-    Value *variable = SymbolTable[scope][varName];
-    if (!variable)
+    Symbol* S = findSymbol(scope, varName);
+
+    if (!S)
         variable = GlobalVariables[varName];
+    else 
+        variable = S->alloca;
 
     if (!variable)
         return LogErrorV("Unknown variable name referenced in assignment operator.");
@@ -395,7 +464,7 @@ Value *ForStmtAST::codegen(const std::string scope) {
     
     AllocaInst *Alloca = CreateEntryBlockAlloca(F, iterator);
     Builder->CreateStore(startV, Alloca);
-    SymbolTable[scope][iterator] = Alloca;
+    addSymbol(iterator, Alloca);
 
     // Basic blocks
     BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", F);
@@ -484,13 +553,15 @@ Value *FunctionAST::codegen(const std::string scope) {
     BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", TheFunction);
     Builder->SetInsertPoint(BB); // Update builder to insert into function
 
+    enterScope(functionScope);
+
     // Adding arguments to function scope
     for (auto &arg : TheFunction->args()) {
         AllocaInst *Alloca = CreateEntryBlockAlloca(TheFunction, arg.getName());
 
         Builder->CreateStore(&arg, Alloca);
         
-        SymbolTable[functionScope][arg.getName().str()] = Alloca;
+        addSymbol(arg.getName().str(), Alloca);
     }
 
     // Generating body
@@ -508,11 +579,14 @@ Value *FunctionAST::codegen(const std::string scope) {
         verifyFunction(*TheFunction);
 
         // Optimizations
-        TheFPM->run(*TheFunction, *TheFAM);
+        // TheFPM->run(*TheFunction, *TheFAM);
+
+        leaveScope();
 
         return TheFunction;
     }
 
+    leaveScope();
     // Error occured, or doesn't have function body (?)
     TheFunction->eraseFromParent();
     return nullptr;
@@ -550,6 +624,13 @@ AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                      TheFunction->getEntryBlock().begin());
     return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, varName);
+}
+
+AllocaInst* CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, size_t numElements) {
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+    
+    ArrayType* ArrayTy = ArrayType::get(Type::getDoubleTy(*TheContext), numElements);
+    return TmpB.CreateAlloca(ArrayTy, nullptr, varName);
 }
 
 std::string generateLoopScope() {

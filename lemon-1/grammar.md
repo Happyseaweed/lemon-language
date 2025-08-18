@@ -100,6 +100,13 @@ x[i][j] = 1.23;
 x[i][j][k] = 1.23;      // Shape and bounds are checked at compile time.
 ```
 
+### How tensors work
+1. Tensor struct is created to keep track of it in C++/LLVM compiler
+2. Struct only contains: `dimensions, shape, data`
+3. 
+
+
+
 
 ---
 # Compilation Details:

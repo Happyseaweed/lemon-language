@@ -1,3 +1,15 @@
+extern printd(x);
 
-var test = [1, 2, 3];
-var a = test[1][2][3];
+func myMain() {
+    tensor tensorVariable = [1, 1, 1];
+    
+    tensor tensorTwo = [2, 2, 2, 2, 2, 2, 2];
+    
+    tensor tensorThree = [3, 3, 3];
+
+    tensor tensorCompelx = [[1,1,1], [2,2,2], [3,3,3]];
+
+    double access = tensorTwo[1];
+}
+
+myMain();
