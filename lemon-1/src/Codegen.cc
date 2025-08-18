@@ -176,7 +176,46 @@ Value *SubscriptExprAST::codegen(const std::string scope) {
     // Generates code and evaluates subscripts to integer values.
     // Check bounds against stored tensor at compile time
     
-    return nullptr;
+    Symbol* S = findSymbol(scope, varName);
+    
+    if (!S) {
+        return LogErrorV("Unknown variable referenced in subscript expression.");
+    }
+
+    if (!S->type.isTensor()) {
+        printf("%s\n", varName.c_str());
+        if (S->type.isScalar()) printf("is double\n");
+        return LogErrorV("Non-tensor variable referenced in subscript expression.");
+    }
+
+    AllocaInst* Alloca = S->alloca;
+
+    // Generating code to evaluate all indices first:
+    std::vector<Value*> subscriptValues;
+    subscriptValues.push_back((Value*)Builder->getInt32(0)); // start of array
+
+
+
+    for (auto& sub : subscripts) {
+        auto SubscriptV = sub->codegen(scope);
+        if (!SubscriptV) {
+            return LogErrorV("Subscript expression is nullptr.");
+        }
+        Value* idx32 = Builder->CreateFPToSI(SubscriptV, 
+                                             Builder->getInt32Ty(), 
+                                             "idxcast");
+
+        subscriptValues.push_back(idx32);
+    }
+
+    // Create GEP:
+    Value* ElementPointer = 
+        Builder->CreateInBoundsGEP(Alloca->getAllocatedType(), 
+                                   Alloca, 
+                                   subscriptValues, 
+                                   "elementPtr");
+
+    return Builder->CreateLoad(Builder->getDoubleTy(), ElementPointer, "loadedValue");
 }
 
 Value *CallExprAST::codegen(const std::string scope) {
@@ -241,14 +280,12 @@ Value *VariableDeclStmt::codegen(const std::string scope) {
             numElements *= shape[i];
         }
         
-        Alloca = CreateEntryBlockAllocaTensor(TheFunction, varName, numElements);
-        dbug();
+        Alloca = CreateEntryBlockAllocaTensor(TheFunction, varName, shape);
         Builder->CreateStore(initVal, Alloca);
-        dbug();
         printf("==============================Tensor CreateStore successful()\n");
     }
 
-    addSymbol(varName, Alloca);
+    addSymbol(varName, Alloca, defBody->type.kind);
 
     return Alloca;
 }
@@ -464,7 +501,7 @@ Value *ForStmtAST::codegen(const std::string scope) {
     
     AllocaInst *Alloca = CreateEntryBlockAlloca(F, iterator);
     Builder->CreateStore(startV, Alloca);
-    addSymbol(iterator, Alloca);
+    addSymbol(iterator, Alloca, LemonType::TypeKind::Double);
 
     // Basic blocks
     BasicBlock *LoopBB = BasicBlock::Create(*TheContext, "loop", F);
@@ -561,7 +598,7 @@ Value *FunctionAST::codegen(const std::string scope) {
 
         Builder->CreateStore(&arg, Alloca);
         
-        addSymbol(arg.getName().str(), Alloca);
+        addSymbol(arg.getName().str(), Alloca, LemonType::TypeKind::Double);
     }
 
     // Generating body
@@ -626,10 +663,14 @@ AllocaInst *CreateEntryBlockAlloca(Function *TheFunction,
     return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, varName);
 }
 
-AllocaInst* CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, size_t numElements) {
+AllocaInst* CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, const std::vector<size_t>& shape) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
     
-    ArrayType* ArrayTy = ArrayType::get(Type::getDoubleTy(*TheContext), numElements);
+    // Should build nested tensor types (shapes are known and fixed at compile time)
+
+    ArrayType* ArrayTy = makeNestedTensorType(shape);
+    
+    // ArrayType* ArrayTy = ArrayType::get(Type::getDoubleTy(*TheContext), numElements);
     return TmpB.CreateAlloca(ArrayTy, nullptr, varName);
 }
 

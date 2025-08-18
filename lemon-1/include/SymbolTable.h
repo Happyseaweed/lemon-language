@@ -31,8 +31,9 @@ Symbol* findSymbol(const std::string& scope, const std::string& variableName) {
     return ret;
 }
 
-void addSymbol(const std::string& variableName, llvm::AllocaInst* alloca) {
+void addSymbol(const std::string& variableName, llvm::AllocaInst* alloca, LemonType::TypeKind type) {
     SymbolTable.back().second[variableName].alloca = alloca;
+    SymbolTable.back().second[variableName].type.kind = type;
 }
 
 void enterScope(const std::string& scope) {

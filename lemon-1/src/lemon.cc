@@ -140,7 +140,6 @@ void runLemon() {
             
             result->showAST(); // Print AST for debugging.
             
-            printf("\nLemon Execution: \n");
             result->codegen();
 
             // Optimizations:
@@ -177,6 +176,7 @@ void runLemon() {
             // Executing main()
             auto ExprSymbol = ExitOnErr(TheJIT->lookup("lemon_main"));
             double (*FP)() = ExprSymbol.toPtr<double (*)()>();
+            printf("\n\n\nLemon Execution: \n");
             FP();
             // fprintf(stderr, "Evaluated to %f\n\n\n", FP());
             

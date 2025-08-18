@@ -490,6 +490,7 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
             getNextToken(); // Consumes next subscript's '[' char.
         }
 
+        printf("Parsed a subscript AST for tensor: %s\n", identifier.c_str());
         return std::make_unique<SubscriptExprAST>(identifier, std::move(subscripts));
     }
 
@@ -615,6 +616,7 @@ std::unique_ptr<ExprAST> ParseTensorExpr() {
     std::unique_ptr<TensorExprAST> tensor = 
         std::make_unique<TensorExprAST>(shape, std::move(values));
 
+    printf("It is a tensor!\n");
     tensor->type.kind = LemonType::TypeKind::Tensor;
     tensor->type.shape = shape;
     

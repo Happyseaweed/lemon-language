@@ -284,7 +284,7 @@ extern int LoopScopeCounter;
 extern std::string generateLoopScope();
 
 extern AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef varName);
-extern AllocaInst *CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, size_t numElements);
+extern AllocaInst *CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, const std::vector<size_t>& shape);
 extern Function *getFunction(std::string name, std::string scope = "_global");
 
 extern std::unique_ptr<FunctionPassManager> TheFPM;

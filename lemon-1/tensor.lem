@@ -10,6 +10,8 @@ func myMain() {
     tensor tensorCompelx = [[1,1,1], [2,2,2], [3,3,3]];
 
     double access = tensorTwo[1];
+    
+    printd(tensorCompelx[access][0 + 1]);
 }
 
 myMain();
