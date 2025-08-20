@@ -183,10 +183,14 @@ public:
 // Same as var decl, can just replace?
 class AssignmentStmt : public StmtAST {
     std::string varName;
+    std::vector<std::unique_ptr<ExprAST>> indexExpressions;
     std::unique_ptr<ExprAST> defBody;
 public:
-    AssignmentStmt(std::string varName, std::unique_ptr<ExprAST> defBody) 
-        : varName(varName), defBody(std::move(defBody)) {}
+    AssignmentStmt(std::string varName, 
+                   std::vector<std::unique_ptr<ExprAST>> indexExpressions, 
+                   std::unique_ptr<ExprAST> defBody)
+        : varName(varName), indexExpressions(std::move(indexExpressions)),
+          defBody(std::move(defBody)) {}
 
     Value *codegen(const std::string scope) override;
     void showAST() override;

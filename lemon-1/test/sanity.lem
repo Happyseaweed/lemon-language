@@ -3,12 +3,12 @@ extern printd(x);
 
 printd(1);
 
-var two = 2;
+
+double two = 2;
 printd(two);
 
-
 func three() {
-    var t = 3;
+    double t = 3;
     printd(t);
 }
 
@@ -22,5 +22,5 @@ four(1, 1, 2);
 
 two = 3;
 
-var five = 2*two - 1;
+double five = 2*two - 1;
 printd(five);

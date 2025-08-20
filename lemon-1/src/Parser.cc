@@ -96,8 +96,9 @@ std::unique_ptr<StmtAST> ParseStatement() {
             return ParseForStmt();
         
         default:
-            fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
-            return LogErrorS("Unknown token when parsing statement.");
+            return nullptr;
+            // fprintf(stderr, "ERROR: Token '%d' is not defined.\n", curTok);
+            // return LogErrorS("Unknown token when parsing statement.");
     }
 }
 
@@ -150,13 +151,19 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
 }
 
 std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
-    int peakedToken = peakNextToken();
+    // Parses statements that start with IDs.
+    //      - Variable assignments  e.g. x = 10;
+    //      - Tensor assignments    e.g. x[idx] = 10;
+    //      - Function calls        e.g. x(argList);
 
-    if (peakedToken == tok_assign) {
+    int peakedToken = peakNextToken();
+    // printf("Parsing variable decl or function call \n");
+
+    if (peakedToken == tok_assign || peakedToken == tok_lbracket) {
         return ParseVariableAssign();
     }
-    else if (peakedToken == tok_lparen || peakedToken == tok_rbracket) {
-        auto expr = ParseIdentifierExpr(); // should return a function call OR subscript
+    else if (peakedToken == tok_lparen) {
+        auto expr = ParseIdentifierExpr(); // Should return parsed function call
         
         if (curTok != tok_semi)
             return LogErrorS("Expected ';' after expression statement.");
@@ -169,10 +176,41 @@ std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
 }
 
 std::unique_ptr<StmtAST> ParseVariableAssign() {
-    // ID = EXPR;
+    // ID   = EXPR;
+    // ID[] = EXPR;
     // Does not allow chaining.
     std::string varName = idStr;
+    printf("Variable assign: (%s)\n", varName.c_str());
+    std::vector<std::unique_ptr<ExprAST>> indexExpressions;
     getNextToken(); // consume ID
+
+    // Parse brackets
+    if (curTok == tok_lbracket) {
+
+        while(true) {
+            if (curTok != tok_lbracket) {
+                return LogErrorS("Expected open bracket '[' in subscripts.");
+            }
+            getNextToken(); // consume '['
+
+            auto E = ParseExpression();
+
+            if (!E) {
+                return LogErrorS("Expected expression as index in [].");
+            }
+            
+            indexExpressions.push_back(std::move(E));
+            
+            if (curTok != tok_rbracket) {
+                return LogErrorS("Expected close bracket ']' in subscripts.");
+            }
+            getNextToken();
+            
+            if (curTok == tok_assign) {
+                break;
+            }
+        }
+    }
 
     if (curTok != tok_assign)
         return LogErrorS("Expected '=' in variable assignment statement.");
@@ -186,7 +224,7 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
         return LogErrorS("Expected ';' after statement.");
     getNextToken();
     
-    return std::make_unique<AssignmentStmt>(varName, std::move(E));
+    return std::make_unique<AssignmentStmt>(varName, std::move(indexExpressions), std::move(E));
 }
 
 // ============================================================================
@@ -432,7 +470,7 @@ std::unique_ptr<ExprAST> ParseFactor() {
         return ParseNumberExpr();           // Number
     }
     else if (curTok == tok_lbracket) {
-        return ParseTensorExpr();           // Tensor
+        return ParseTensorExpr();           // Tensor element
     }
     else if (curTok == tok_lparen) {        
         getNextToken(); // consume '('

@@ -2,7 +2,7 @@
 #include "../include/Lexer.h"
 
 void LemonAST::showAST() {
-    printf("Lemon AST:\n");
+    printf("\n\n### Lemon AST:\n");
     for (auto &statement : statements) {
         statement->showAST();
     }
@@ -30,7 +30,7 @@ void VariableExprAST::showAST() {
 void TensorExprAST::showAST() {
     printf("(");
     for (auto &item : shape) {
-        printf("%d, ", item);
+        printf("%lu, ", item);
     }
     printf(")[");
     

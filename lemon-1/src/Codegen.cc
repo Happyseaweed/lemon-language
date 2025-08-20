@@ -4,6 +4,7 @@
 #include "../include/SymbolTable.h"
 
 using namespace llvm;
+using namespace Lemon;
 
 std::unique_ptr<LLVMContext> TheContext;
 std::unique_ptr<IRBuilder<>> Builder; 
@@ -15,7 +16,7 @@ std::unique_ptr<IRBuilder<>> FunctionBuilder;
 std::unique_ptr<Module> TheModule;
 // std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable;  // SymbolTable for each scope.
 // std::stack<std::string> ScopeStack;
-std::vector<std::pair<std::string, std::unordered_map<std::string, Symbol>>> SymbolTable;
+// std::vector<std::pair<std::string, std::unordered_map<std::string, Symbol>>> SymbolTable;
 std::map<std::string, GlobalVariable*> GlobalVariables;                 // Global variables
 std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;    // Function signatures
 
@@ -46,7 +47,8 @@ void dbug() {
 }
 
 Value *LemonAST::codegen(const std::string scope) {
-    // fprintf(stderr, "# Lemon Codegen Started\n");
+    fprintf(stderr, "\n#### Lemon Codegen Started\n");
+    enterScope("_global");
     const int totalStatements = statements.size();
     int i = 0;
     for (auto &statement : statements) {
@@ -56,6 +58,7 @@ Value *LemonAST::codegen(const std::string scope) {
         }
         i++;
     }
+    leaveScope();
     return nullptr;
 }
 
@@ -79,20 +82,20 @@ Value *BinaryExprAST::codegen(const std::string scope) {
     case tok_div:
         return TmpBuilder->CreateFDiv(L, R, "divtmp");
     case tok_lt:
-        L = TmpBuilder->CreateFCmpULT(L, R, "cmptmp_lt");
-        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_lt");
+        return TmpBuilder->CreateFCmpULT(L, R, "cmptmp_lt");
+        // return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_lt");
     case tok_gt:
-        L = TmpBuilder->CreateFCmpUGT(L, R, "cmptmp_gt");
+        return TmpBuilder->CreateFCmpUGT(L, R, "cmptmp_gt");
         return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_gt");
     case tok_le:
-        L = TmpBuilder->CreateFCmpULE(L, R, "cmptmp_le");
+        return TmpBuilder->CreateFCmpULE(L, R, "cmptmp_le");
         return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_le");
     case tok_ge:
-        L = TmpBuilder->CreateFCmpUGE(L, R, "cmptmp_ge");
+        return TmpBuilder->CreateFCmpUGE(L, R, "cmptmp_ge");
         return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_ge");
     case tok_eq:
-        L = TmpBuilder->CreateFCmpUEQ(L, R, "cmptmp_eq");
-        return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_eq");
+        return TmpBuilder->CreateFCmpUEQ(L, R, "cmptmp_eq");
+        // return TmpBuilder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp_eq");
 
     default:
         return LogErrorV("Invalid Binary Operator.");
@@ -100,29 +103,34 @@ Value *BinaryExprAST::codegen(const std::string scope) {
 }
 
 Value *NumberExprAST::codegen(const std::string scope) {
-    printf("NumberExprAST::codegen()\n");
     return ConstantFP::get(*TheContext, APFloat(val));
 }
 
 Value *VariableExprAST::codegen(const std::string scope) {
     Symbol* S = findSymbol(scope, varName);
+    GlobalVariable* GV = nullptr;
+    AllocaInst* LV = nullptr;
+    bool isGlobal = false;
 
-    GlobalVariable* GV = GlobalVariables[varName];
+    if (!S) {
+        std::string errorStr = "Unknown variable name (" + varName + ") referenced in Scope: (" + scope + ").";
+        return LogErrorV(errorStr.c_str());
+    }
 
-    if (S) {
-        AllocaInst* A = S->alloca;
-        LemonType::Type VT = S->type;
+    isGlobal = S->isGlobal;
+
+    if (!isGlobal) {
+        AllocaInst* A = (AllocaInst*)S->alloca;
         if (scope == "_global")
             return MainBuilder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
         return Builder->CreateLoad(A->getAllocatedType(), A, varName.c_str());
-    }
-    else if (GV) {
-        if (scope == "_global")
-            return MainBuilder->CreateLoad(GV->getValueType(), GV, varName.c_str());
-        return Builder->CreateLoad(GV->getValueType(), GV, varName.c_str());
-    }
-    std::string errorStr = "Unknown variable name (" + varName + ") referenced in Scope: (" + scope + ").";
-    return LogErrorV(errorStr.c_str());
+    } 
+
+    // Global variable:
+    GV = (GlobalVariable*)S->alloca;
+    if (scope == "_global")
+        return MainBuilder->CreateLoad(GV->getValueType(), GV, varName.c_str());
+    return Builder->CreateLoad(GV->getValueType(), GV, varName.c_str());
 }
 
 ArrayType* makeNestedTensorType(const std::vector<size_t>& shape) {
@@ -177,6 +185,7 @@ Value *SubscriptExprAST::codegen(const std::string scope) {
     // Check bounds against stored tensor at compile time
     
     Symbol* S = findSymbol(scope, varName);
+    AllocaInst* Alloca = nullptr;
     
     if (!S) {
         return LogErrorV("Unknown variable referenced in subscript expression.");
@@ -188,13 +197,11 @@ Value *SubscriptExprAST::codegen(const std::string scope) {
         return LogErrorV("Non-tensor variable referenced in subscript expression.");
     }
 
-    AllocaInst* Alloca = S->alloca;
+    Alloca = (AllocaInst*)S->alloca;
 
     // Generating code to evaluate all indices first:
     std::vector<Value*> subscriptValues;
     subscriptValues.push_back((Value*)Builder->getInt32(0)); // start of array
-
-
 
     for (auto& sub : subscripts) {
         auto SubscriptV = sub->codegen(scope);
@@ -252,25 +259,18 @@ Value *VariableDeclStmt::codegen(const std::string scope) {
 
     Value *initVal;
 
-    printf("Checking to generate defBody\n");
-
     if (defBody) {
-        printf("defBody is good, generating defBody\n");
         initVal = defBody->codegen(scope);
         if (!initVal)
             return nullptr;
     } else {
         // If not specified, default to 0.0.
         initVal = ConstantFP::get(*TheContext, APFloat(0.0)); 
-        printf("defBody not specified, defaulting to 0!\n");
     }
 
     AllocaInst *Alloca = nullptr;
 
-    printf("going into if check in decl gen\n");
-
     if (defBody->type.isScalar()) {
-        printf("defBody is scalar\n");
         Alloca = CreateEntryBlockAlloca(TheFunction, varName);
         Builder->CreateStore(initVal, Alloca);
     } else {
@@ -282,7 +282,6 @@ Value *VariableDeclStmt::codegen(const std::string scope) {
         
         Alloca = CreateEntryBlockAllocaTensor(TheFunction, varName, shape);
         Builder->CreateStore(initVal, Alloca);
-        printf("==============================Tensor CreateStore successful()\n");
     }
 
     addSymbol(varName, Alloca, defBody->type.kind);
@@ -344,10 +343,14 @@ Value *VariableDeclStmt::codegen_global() {
         swap(TmpBuilder, Builder); // Swap back the old builder.
         
         // Optimizations
-        // TheFPM->run(*F, *TheFAM);
+        TheFPM->run(*F, *TheFAM);
 
         // Add it to table
-        GlobalVariables[varName] = GV;
+        // GlobalVariables[varName] = GV;
+        dbug();
+
+        addSymbol(varName, GV, LemonType::TypeKind::Double);
+        dbug();
         
         // Call init function in main
         std::string initFuncName = initFuncScope;
@@ -368,16 +371,48 @@ Value *AssignmentStmt::codegen(const std::string scope) {
     Symbol* S = findSymbol(scope, varName);
 
     if (!S)
-        variable = GlobalVariables[varName];
-    else 
+        return LogErrorV("Unknown variable name referenced in assignment operator.");
+
+    if (S)
         variable = S->alloca;
 
     if (!variable)
         return LogErrorV("Unknown variable name referenced in assignment operator.");
 
+    if (S->type.isTensor()) {
+        printf("Assigning to tensor variable.\n");
+        AllocaInst* Alloca = (AllocaInst*)S->alloca;
+
+        // Generating code to evaluate all indices first:
+        std::vector<Value*> subscriptValues;
+        subscriptValues.push_back((Value*)Builder->getInt32(0)); // start of array
+
+        for (auto& sub : indexExpressions) {
+            auto SubscriptV = sub->codegen(scope);
+            if (!SubscriptV) {
+                return LogErrorV("Subscript expression is nullptr.");
+            }
+            Value* idx32 = Builder->CreateFPToSI(SubscriptV, 
+                                                Builder->getInt32Ty(), 
+                                                "idxcast");
+
+            subscriptValues.push_back(idx32);
+        }
+
+        // Create GEP:
+        Value* ElementPointer = 
+            Builder->CreateInBoundsGEP(Alloca->getAllocatedType(), 
+                                    Alloca, 
+                                    subscriptValues, 
+                                    "elementPtr");
+        
+        variable = ElementPointer;
+    } 
+
+    printf("Creating stores\n");
     if (scope == "_global") 
         MainBuilder->CreateStore(newVal, variable);
-    else    
+    else
         Builder->CreateStore(newVal, variable);
 
     return newVal;
@@ -393,7 +428,9 @@ Value *ExpressionStmtAST::codegen(const std::string scope) {
 }
 
 Value *IfStmtAST::codegen(const std::string scope) {
+    printf("IfStmt Codegen()\n");
     Value *condV = cond->codegen(scope);
+    Value *condBoolV = nullptr;
 
     if (!condV)
         return nullptr;
@@ -402,11 +439,29 @@ Value *IfStmtAST::codegen(const std::string scope) {
     if (scope == "_global")             
         swap(Builder, MainBuilder);
 
-    condV = Builder->CreateFCmpONE(
-        condV, 
-        ConstantFP::get(*TheContext, APFloat(0.0)), 
-        "ifcond"
-    );
+    if (condV->getType()->isDoubleTy()) {
+        // If cond evaluates to double, check for cond != 0.0
+        condBoolV = Builder->CreateFCmpONE(
+            condV, 
+            ConstantFP::get(*TheContext, APFloat(0.0)), 
+            "ifcond"
+        );
+    }
+    else if (condV->getType()->isIntegerTy(1)) {
+        // already boolean
+        condBoolV = condV;
+    }
+    else if (condV->getType()->isIntegerTy()) {
+        // Integer, check for cond != 0
+        condBoolV = Builder->CreateICmpNE(
+            condV, 
+            ConstantInt::get(condV->getType(), 0),
+            "ifcond"
+        );
+    } else {
+        return LogErrorV("If cond expression evaluated to unknown type.");
+    }
+
 
     Function *TheFunction = Builder->GetInsertBlock()->getParent();
     BasicBlock *ThenBB = 
@@ -499,6 +554,7 @@ Value *ForStmtAST::codegen(const std::string scope) {
     // Get parent block
     Function* F = Builder->GetInsertBlock()->getParent();
     
+    // Iterator
     AllocaInst *Alloca = CreateEntryBlockAlloca(F, iterator);
     Builder->CreateStore(startV, Alloca);
     addSymbol(iterator, Alloca, LemonType::TypeKind::Double);
@@ -510,21 +566,21 @@ Value *ForStmtAST::codegen(const std::string scope) {
     if (scope == "_global")
         swap(Builder, MainBuilder);
     
-        // Calculate step value
+    // Calculate step value
     Value *stepVal = step->codegen(scope);
 
-    // Evaluate expression to a value
-    Value *endVal = end->codegen(scope);
-    if (!endVal)
+    // Builder->CreateRetVoid();
+    // Evaluate the ending condition.
+    Value *endCond = end->codegen(scope);
+    // Builder->CreateRetVoid();
+    if (!endCond)
         return nullptr;
 
-    
     if (scope == "_global")
         swap(Builder, MainBuilder);
 
     // Compare current value & branch
-    Value *curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
-    Value *endCond = Builder->CreateFCmpULT(curVal, endVal, "loopcond");
+    // Value *curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
     Builder->CreateCondBr(endCond, LoopBB, AfterBB);
 
     // Loop body:
@@ -541,12 +597,13 @@ Value *ForStmtAST::codegen(const std::string scope) {
         swap(Builder, MainBuilder);
 
     // Increment iterator
-    curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
+    Value *curVal = Builder->CreateLoad(Alloca->getAllocatedType(), Alloca, iterator.c_str());
     Value *nextVal = Builder->CreateFAdd(curVal, stepVal, "nextval");
     Builder->CreateStore(nextVal, Alloca);
     
     // Check termination condition
-    endCond = Builder->CreateFCmpULT(nextVal, endVal, "loopcond");
+    endCond = end->codegen(scope);
+    // endCond = Builder->CreateFCmpULT(nextVal, endVal, "loopcond");
     Builder->CreateCondBr(endCond, LoopBB, AfterBB);
 
     Builder->SetInsertPoint(AfterBB);
@@ -611,7 +668,8 @@ Value *FunctionAST::codegen(const std::string scope) {
                 Builder->CreateRet(stmtVal);
             }
         }
-        Builder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
+        if (!Builder->GetInsertBlock()->getTerminator())
+            Builder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0)));
 
         verifyFunction(*TheFunction);
 

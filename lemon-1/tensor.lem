@@ -1,17 +1,53 @@
 extern printd(x);
 
-func myMain() {
-    tensor tensorVariable = [1, 1, 1];
-    
-    tensor tensorTwo = [2, 2, 2, 2, 2, 2, 2];
-    
-    tensor tensorThree = [3, 3, 3];
-
-    tensor tensorCompelx = [[1,1,1], [2,2,2], [3,3,3]];
-
-    double access = tensorTwo[1];
-    
-    printd(tensorCompelx[access][0 + 1]);
+func anotherMain() {
+    tensor tTest = [9, 9, 9];
+    printd(tTest[2]);
+    tTest[1] = 3;
+    printd(tTest[2] + tTest[1] + tTest[0]);
 }
 
+func myMain() {
+    # tensor tensorVariable = [1, 1, 1];
+    # 
+    # tensor tensorTwo = [2, 2, 2, 2, 2, 2, 2];
+    # 
+    # tensor tensorThree = [3, 3, 3];
+
+    tensor tensorComplex = [[1,1,1], [2,2,2], [3,3,3]];
+
+    # tensor tensorDouble = [1.1, 2.2, 3.3];
+
+    # double access = tensorTwo[1];
+    
+    #printd(tensorCompelx[access][0 + 1]);
+
+    #printd(tensorDouble[2] * tensorCompelx[access][0.5 + 0.5]);
+
+    tensor tTest = [1, 2, 3, 4, 5, 6, 7];
+    for (i = 0, i < 7) {
+        printd(tTest[i]);
+    }
+
+    for (i = 0, i < 7) {
+        tTest[i] = 10;
+    }
+
+    for (i = 0, i < 7) {
+        printd(tTest[i]);
+    }
+
+    if (tTest[0] + tTest[1] >= 3) {
+        printd(0.10101);
+    } else {
+        printd(0);
+    }
+
+    anotherMain();
+    return 0;
+    # return tensorDouble[2];
+}
+
+
 myMain();
+anotherMain();

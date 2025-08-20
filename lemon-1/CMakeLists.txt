@@ -29,6 +29,7 @@ set(SOURCES
     src/Ast.cc
     src/Codegen.cc
     src/ShowAST.cc
+    src/SymbolTable.cc
 )
 
 add_executable(lemon ${SOURCES})
