@@ -1,5 +1,8 @@
 
-# Grammar For Lemon-1 
+# Grammar For Lemon-1
+##### Anything and Everything about the langauge.
+Occasionally also a scratch board for ideas!
+
 Imperative, Statically Typed
 
 LEMON           ::= STATEMENT_LIST
@@ -100,12 +103,15 @@ x[i][j] = 1.23;
 x[i][j][k] = 1.23;      // Shape and bounds are checked at compile time.
 ```
 
-### How tensors work
-1. Tensor struct is created to keep track of it in C++/LLVM compiler
-2. Struct only contains: `dimensions, shape, data`
-3. 
+### How tensors work (As of Aug 21, 2025)
+1. Tensors are flattend to 1D arrays and stored as such in LLVM.
+2. Tensor sizes and shapes are fixed only on declaration / assignment.
+    - i.e. You cannot append or pop rows or columns from tensors
+3. Is stack-allocated with LLVM allocaInst*
+4. No safety nets! Responsibility falls on programmer.
 
-
+### Tensor Improvement (Fixed rank, run-time data)
+1. 
 
 
 ---

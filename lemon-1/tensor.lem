@@ -44,10 +44,23 @@ func myMain() {
     }
 
     anotherMain();
+
+    tensor reassignTest = [1, 2, 3];
+    printd(reassignTest[0] + reassignTest[1] + reassignTest[2]);
+
+    reassignTest = [10, 11, 12];
+    printd(reassignTest[0] + reassignTest[1] + reassignTest[1+1]);
+
     return 0;
     # return tensorDouble[2];
 }
 
+# Tensor<1> tensor1D = [1, 2, 3, 4];
+# Tensor<2> tensor2D = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
+# Tensor<3> tensor3D = [ 
+#                         [[1.1, 1.1, 1.1], [1.2, 1.2, 1.2], [1,3. 1.3, 1.3]],
+#                         [[2.1, 2.1, 2.1], [2.2, 2.2, 2.2], [2,3. 2.3, 2.3]],
+#                         [[3.1, 3.1, 3.1], [3.2, 3.2, 3.2], [3,3. 3.3, 3.3]],
+#                      ]
 
 myMain();
-anotherMain();
