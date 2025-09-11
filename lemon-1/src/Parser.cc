@@ -80,7 +80,9 @@ std::unique_ptr<StmtAST> ParseStatement() {
     switch (curTok) {
         case tok_return:
             return ParseReturn();
-        case tok_var:
+        // case tok_var:
+        case tok_double:
+        case tok_tensor:
             return ParseVariableDecl();
         case tok_id:
             return ParseVariableAssignOrFunctionCall();
@@ -121,7 +123,9 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
     // Does not allow chaining (yet): var ID1, ID1, ID3, = EXPR1, EXPR2, EXPR3;
 
     std::string varName;
-    getNextToken(); // Consume 'var' kw
+    bool isDouble = curTok == tok_double ? true : false;
+
+    getNextToken(); // Consume variable type keyword
 
     varName = idStr;
     getNextToken(); // Consume ID
@@ -138,17 +142,28 @@ std::unique_ptr<StmtAST> ParseVariableDecl() {
         return LogErrorS("Expected ';' after statement.");
     getNextToken();
     
+    if (isDouble)
+        E->type.kind = LemonType::TypeKind::Double;
+    else 
+        E->type.kind = LemonType::TypeKind::Tensor;
+
     return std::make_unique<VariableDeclStmt>(varName, std::move(E));
 }
 
 std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
-    int peakedToken = peakNextToken();
+    // Parses statements that start with IDs.
+    //      - Variable assignments  e.g. x = 10;
+    //      - Tensor assignments    e.g. x[idx] = 10;
+    //      - Function calls        e.g. x(argList);
 
-    if (peakedToken == tok_assign) {
+    int peakedToken = peakNextToken();
+    // printf("Parsing variable decl or function call \n");
+
+    if (peakedToken == tok_assign || peakedToken == tok_lbracket) {
         return ParseVariableAssign();
     }
     else if (peakedToken == tok_lparen) {
-        auto expr = ParseIdentifierExpr(); // should return a function call.
+        auto expr = ParseIdentifierExpr(); // Should return parsed function call
         
         if (curTok != tok_semi)
             return LogErrorS("Expected ';' after expression statement.");
@@ -156,14 +171,46 @@ std::unique_ptr<StmtAST> ParseVariableAssignOrFunctionCall() {
 
         return std::make_unique<ExpressionStmtAST>(std::move(expr));
     }
+    
     return nullptr; 
 }
 
 std::unique_ptr<StmtAST> ParseVariableAssign() {
-    // ID = EXPR;
+    // ID   = EXPR;
+    // ID[] = EXPR;
     // Does not allow chaining.
     std::string varName = idStr;
+    printf("Variable assign: (%s)\n", varName.c_str());
+    std::vector<std::unique_ptr<ExprAST>> indexExpressions;
     getNextToken(); // consume ID
+
+    // Parse brackets
+    if (curTok == tok_lbracket) {
+
+        while(true) {
+            if (curTok != tok_lbracket) {
+                return LogErrorS("Expected open bracket '[' in subscripts.");
+            }
+            getNextToken(); // consume '['
+
+            auto E = ParseExpression();
+
+            if (!E) {
+                return LogErrorS("Expected expression as index in [].");
+            }
+            
+            indexExpressions.push_back(std::move(E));
+            
+            if (curTok != tok_rbracket) {
+                return LogErrorS("Expected close bracket ']' in subscripts.");
+            }
+            getNextToken();
+            
+            if (curTok == tok_assign) {
+                break;
+            }
+        }
+    }
 
     if (curTok != tok_assign)
         return LogErrorS("Expected '=' in variable assignment statement.");
@@ -177,7 +224,7 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
         return LogErrorS("Expected ';' after statement.");
     getNextToken();
     
-    return std::make_unique<AssignmentStmt>(varName, std::move(E));
+    return std::make_unique<AssignmentStmt>(varName, std::move(indexExpressions), std::move(E));
 }
 
 // ============================================================================
@@ -185,7 +232,7 @@ std::unique_ptr<StmtAST> ParseVariableAssign() {
 // ============================================================================
 
 std::unique_ptr<FunctionAST> ParseFunction() {
-    // func ID ( arg_list ) { STATEMENT LIST }
+    // func ID ( arg_list ) { STATEMENT LIST 
     getNextToken(); // Consumes 'func' keyword
     
     auto proto = ParsePrototype();
@@ -422,9 +469,12 @@ std::unique_ptr<ExprAST> ParseFactor() {
     else if (curTok == tok_num) {
         return ParseNumberExpr();           // Number
     }
-    else if (curTok == tok_lparen) {        // '(' Expression ')'
+    else if (curTok == tok_lbracket) {
+        return ParseTensorExpr();           // Tensor element
+    }
+    else if (curTok == tok_lparen) {        
         getNextToken(); // consume '('
-        auto E = ParseExpression();
+        auto E = ParseExpression();         // '(' Expression ')'
 
         if (curTok != tok_rparen) 
             return LogError("Expected ')' after expression.");
@@ -439,31 +489,61 @@ std::unique_ptr<ExprAST> ParseFactor() {
 std::unique_ptr<ExprAST> ParseNumberExpr() {
     auto result = std::make_unique<NumberExprAST>(numVal);
     getNextToken(); // Consume num token
+
+    result->type.kind = LemonType::TypeKind::Double;
+
     return std::move(result);
 }
 
 std::unique_ptr<ExprAST> ParseIdentifierExpr() {
-    std::string identifier = idStr;
+    std::string identifier = idStr;                     // Id name
+    std::vector<std::unique_ptr<ExprAST>> subscripts;   // For tensor subscript expr
+    std::vector<std::unique_ptr<ExprAST>> argList;      // For function call expr
     getNextToken(); // Consume ID;
 
     // If just an ID
-    if (curTok != tok_lparen) {
+    if (curTok != tok_lparen && curTok != tok_lbracket) {
         return std::make_unique<VariableExprAST>(identifier);
     }
 
+    // If subscripts
+    if (curTok == tok_lbracket) {
+        getNextToken(); // Consume '['
+
+        while(true) {
+            auto E = ParseExpression();
+            if (!E) {
+                return LogError("Expected expression in subscript operator.");
+            }
+
+            subscripts.push_back(std::move(E));
+            if (curTok != tok_rbracket) {
+                return LogError("Expected ']' after subscript.");
+            }
+            getNextToken(); //Consumes ']'
+            
+            if (curTok != tok_lbracket) {
+                break;
+            }
+            getNextToken(); // Consumes next subscript's '[' char.
+        }
+
+        printf("Parsed a subscript AST for tensor: %s\n", identifier.c_str());
+        return std::make_unique<SubscriptExprAST>(identifier, std::move(subscripts));
+    }
+
     // If function call
-    // printf("Parsing function call: %s\n", identifier.c_str());
-    std::vector<std::unique_ptr<ExprAST>> argList;
     getNextToken(); // consume '('
 
     // Arg list
     if (curTok != tok_rparen) {
         while(true) {
-            if (auto arg = ParseExpression()) {
-                argList.push_back(std::move(arg));
-            } else {
+            auto arg = ParseExpression();
+            if (!arg) {
                 return nullptr;
             }
+
+            argList.push_back(std::move(arg));
 
             if (curTok == tok_rparen)
                 break;
@@ -479,4 +559,104 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
     getNextToken(); // Consume ')'
     
     return std::make_unique<CallExprAST>(identifier, std::move(argList));
+}
+
+std::unique_ptr<ExprAST> ParseTensorExpr() {
+    // [...]
+    std::vector<size_t> shape;
+    std::vector<std::unique_ptr<ExprAST>> values;
+    size_t curDimensionCount = 0;
+    std::vector<size_t> subShape;
+    int subTensorCount = 0;
+
+    getNextToken(); // Consume '['
+
+    while(true) {
+        if (curTok == tok_lbracket) {
+            // sub-tensor
+            printf("Tensor in Tensor\n");
+            auto E = ParseTensorExpr();
+            if (!E) {
+                return nullptr;
+            }
+            
+            subTensorCount += 1;
+            TensorExprAST* TE = dynamic_cast<TensorExprAST*>(E.get());
+
+            if (subShape.size() > 0 && subShape != TE->getShape()) {
+                return LogError("Tensor shape incorrect, different shaped sub-tensors.");               
+            } else {
+                subShape = TE->getShape();
+            }
+            
+            values.push_back(std::move(E));
+        }
+        else if (curTok == tok_num) {
+            auto E = ParseNumberExpr();
+            printf("Num in Tensor\n");
+            if (!E) {
+                return nullptr;
+            }
+
+            if (subTensorCount > 0) {
+                return LogError("Tensor shape incorrect, cannot contain mix of tensors and nums.");
+            }
+
+            values.push_back(std::move(E));
+        }
+        else if (curTok == tok_id) {
+            auto E = ParseIdentifierExpr();
+            printf("Num in Tensor\n");
+            if (!E) {
+                return nullptr;
+            }
+            
+            if (subTensorCount > 0) {
+                return LogError("Tensor shape incorrect, cannot contain mix of tensors and IDs.");
+            }
+
+            values.push_back(std::move(E));
+        }
+        else {
+            return LogError("Expected expression in tensor decl list.");
+        }
+        curDimensionCount++;
+
+        if (curTok == tok_rbracket) {
+            break;
+        }
+
+        if (curTok != tok_comma) {
+            printf("CurTok: %d\n", curTok);
+            return LogError("Expected ',' in tensor decl list.");
+        }
+        getNextToken(); // Consume ','
+    }
+
+    if (curTok != tok_rbracket) {
+        return LogError("Expected ']' after tensor decl.");
+    }
+    getNextToken(); // consume ']'
+    
+    // Checking for bad shapes
+    if (subTensorCount > 0 && subTensorCount != curDimensionCount) {
+        return LogError("Tensor shape incorrect, cannot contain mix of tensors and NUM/IDs.");
+    }   
+
+    // Update shape for current tensor
+    shape.push_back(curDimensionCount);
+    if (subShape.size() != 0) {
+        for (auto &item : subShape) {
+            shape.push_back(item);
+        }
+    }
+    
+    std::unique_ptr<TensorExprAST> tensor = 
+        std::make_unique<TensorExprAST>(shape, std::move(values));
+
+    printf("It is a tensor!\n");
+    tensor->type.kind = LemonType::TypeKind::Tensor;
+    tensor->type.shape = shape;
+    
+    return std::move(tensor);
 }

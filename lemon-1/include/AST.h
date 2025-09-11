@@ -1,6 +1,8 @@
 // ============================================================================
 // AST Declarations 
 // ============================================================================
+#pragma once
+
 #include "llvm/IR/Value.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -21,8 +23,10 @@
 #include <llvm/Support/TargetSelect.h>
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/IR/DerivedTypes.h"
 
 #include "./LemonJIT.h"
+#include "./Types.h"
 
 #include <string>
 #include <vector>
@@ -33,11 +37,11 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-#pragma once
 
 // EXPRESSION
 class ExprAST {
 public:
+    mutable LemonType::Type type;
     virtual ~ExprAST() = default;
     virtual Value *codegen(const std::string scope) = 0;
     virtual void showAST() = 0;
@@ -107,6 +111,34 @@ public:
     const std::string getVarName() const { return varName; }
 };
 
+class TensorExprAST : public ExprAST {
+    std::vector<size_t> shape;
+    std::vector<std::unique_ptr<ExprAST>> values;
+
+public:
+    TensorExprAST(std::vector<size_t> shape, std::vector<std::unique_ptr<ExprAST>> values)
+        : shape(std::move(shape)), values(std::move(values)) {}
+
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+
+    const std::vector<size_t> getShape() const { return shape; }
+    const size_t getSize() const { return values.size(); }
+    const std::vector<std::unique_ptr<ExprAST>> &getValues() { return values; }
+};
+
+class SubscriptExprAST : public ExprAST {
+    std::string varName;
+    std::vector<std::unique_ptr<ExprAST>> subscripts;
+public:
+    SubscriptExprAST(std::string varName, 
+                     std::vector<std::unique_ptr<ExprAST>> subscripts)
+        : varName(varName), subscripts(std::move(subscripts)) {}
+    
+    Value *codegen(const std::string scope) override;
+    void showAST() override;
+};
+
 class CallExprAST : public ExprAST {
     std::string callee; 
     std::vector<std::unique_ptr<ExprAST>> args;
@@ -151,10 +183,14 @@ public:
 // Same as var decl, can just replace?
 class AssignmentStmt : public StmtAST {
     std::string varName;
+    std::vector<std::unique_ptr<ExprAST>> indexExpressions;
     std::unique_ptr<ExprAST> defBody;
 public:
-    AssignmentStmt(std::string varName, std::unique_ptr<ExprAST> defBody) 
-        : varName(varName), defBody(std::move(defBody)) {}
+    AssignmentStmt(std::string varName, 
+                   std::vector<std::unique_ptr<ExprAST>> indexExpressions, 
+                   std::unique_ptr<ExprAST> defBody)
+        : varName(varName), indexExpressions(std::move(indexExpressions)),
+          defBody(std::move(defBody)) {}
 
     Value *codegen(const std::string scope) override;
     void showAST() override;
@@ -244,14 +280,15 @@ extern std::unique_ptr<IRBuilder<>> MainBuilder;
 extern std::unique_ptr<IRBuilder<>> FunctionBuilder;
 
 extern std::unique_ptr<Module> TheModule;
-extern std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable; // Stores all variables
-extern std::stack<std::string> ScopeStack;
+// extern std::map<std::string, std::map<std::string, AllocaInst*>> SymbolTable; // Stores all variables
+// extern std::stack<std::string> ScopeStack;
 extern std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
 
 extern int LoopScopeCounter;
 extern std::string generateLoopScope();
 
 extern AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef varName);
+extern AllocaInst *CreateEntryBlockAllocaTensor(Function *TheFunction, StringRef varName, const std::vector<size_t>& shape);
 extern Function *getFunction(std::string name, std::string scope = "_global");
 
 extern std::unique_ptr<FunctionPassManager> TheFPM;

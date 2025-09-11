@@ -137,12 +137,13 @@ void runLemon() {
             
             BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", F);
             MainBuilder->SetInsertPoint(BB);
+           
+            result->showAST(); // Print AST for debugging.
             
-            // result->showAST(); // Print AST for debugging.
             result->codegen();
-            
+
             // Optimizations:
-            // TheFPM->run(*F, *TheFAM);
+            TheFPM->run(*F, *TheFAM);
 
             // Saving LLVM IR to a file.
             std::error_code EC;
@@ -175,6 +176,7 @@ void runLemon() {
             // Executing main()
             auto ExprSymbol = ExitOnErr(TheJIT->lookup("lemon_main"));
             double (*FP)() = ExprSymbol.toPtr<double (*)()>();
+            printf("\n\n\nLemon Execution: \n");
             FP();
             // fprintf(stderr, "Evaluated to %f\n\n\n", FP());
             

@@ -64,3 +64,5 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(int precedence, std::unique_ptr<ExprAST> 
 std::unique_ptr<ExprAST> ParseNumberExpr();
 
 std::unique_ptr<ExprAST> ParseIdentifierExpr();
+
+std::unique_ptr<ExprAST> ParseTensorExpr();

@@ -2,7 +2,7 @@
 #include "../include/Lexer.h"
 
 void LemonAST::showAST() {
-    printf("Lemon AST:\n");
+    printf("\n\n### Lemon AST:\n");
     for (auto &statement : statements) {
         statement->showAST();
     }
@@ -25,6 +25,30 @@ void NumberExprAST::showAST() {
 
 void VariableExprAST::showAST() {
     printf("Var(%s)", varName.c_str());
+}
+
+void TensorExprAST::showAST() {
+    printf("(");
+    for (auto &item : shape) {
+        printf("%lu, ", item);
+    }
+    printf(")[");
+    
+    for (auto &item : values) {
+        item->showAST();
+        printf(",");
+    }
+    printf("]\n");
+}
+
+void SubscriptExprAST::showAST() {
+    printf("(subscpt)%s", varName.c_str());
+    for (auto &item : subscripts) {
+        printf("[");
+        item->showAST();
+        printf("]");
+    }
+    printf(";\n");
 }
 
 void CallExprAST::showAST() {
